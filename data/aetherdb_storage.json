@@ -1,0 +1,101 @@
+{
+  "main_db": {
+    "name": "main_db",
+    "charset": "utf8mb4",
+    "collation": "utf8mb4_unicode_ci",
+    "sizeBytes": 65536,
+    "createdAt": "2026-10-02T16:01:06.580Z",
+    "tables": {
+      "users": {
+        "schema": {
+          "name": "users",
+          "createdAt": "2026-10-02T16:01:06.580Z",
+          "indexes": [
+            "idx_users_email"
+          ],
+          "columns": [
+            {
+              "name": "id",
+              "type": "INTEGER",
+              "primaryKey": true,
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "type": "VARCHAR",
+              "nullable": false
+            },
+            {
+              "name": "email",
+              "type": "VARCHAR",
+              "nullable": false,
+              "unique": true
+            },
+            {
+              "name": "role",
+              "type": "VARCHAR",
+              "nullable": false,
+              "defaultValue": "member"
+            },
+            {
+              "name": "created_at",
+              "type": "TIMESTAMP",
+              "nullable": false
+            }
+          ]
+        },
+        "autoIncrementCurrent": 1,
+        "rows": []
+      },
+      "posts": {
+        "schema": {
+          "name": "posts",
+          "createdAt": "2026-10-02T16:01:06.580Z",
+          "indexes": [
+            "idx_posts_user_id"
+          ],
+          "columns": [
+            {
+              "name": "id",
+              "type": "INTEGER",
+              "primaryKey": true,
+              "nullable": false
+            },
+            {
+              "name": "user_id",
+              "type": "INTEGER",
+              "nullable": false,
+              "references": {
+                "table": "users",
+                "column": "id"
+              }
+            },
+            {
+              "name": "title",
+              "type": "VARCHAR",
+              "nullable": false
+            },
+            {
+              "name": "content",
+              "type": "VARCHAR",
+              "nullable": true
+            },
+            {
+              "name": "published",
+              "type": "BOOLEAN",
+              "nullable": false,
+              "defaultValue": false
+            },
+            {
+              "name": "created_at",
+              "type": "TIMESTAMP",
+              "nullable": false
+            }
+          ]
+        },
+        "autoIncrementCurrent": 1,
+        "rows": []
+      }
+    }
+  }
+}

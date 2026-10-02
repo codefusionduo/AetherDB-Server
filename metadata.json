@@ -1,0 +1,6 @@
+{
+  "name": "AetherDB — High Performance Database Server & Studio",
+  "description": "An all-in-one relational and document database server engine with live SQL console, table visualizer, ER diagram modeler, REST API endpoints, and real-time server telemetry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
