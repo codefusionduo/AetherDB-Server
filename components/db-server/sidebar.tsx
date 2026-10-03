@@ -15,7 +15,8 @@ import {
   FileJson,
   ShieldCheck,
   FolderArchive,
-  Radio
+  Radio,
+  Mail
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -27,6 +28,7 @@ export type ActiveTab =
   | 'auth'
   | 'storage'
   | 'realtime'
+  | 'email'
   | 'metrics'
   | 'apihub'
   | 'users'
@@ -60,6 +62,7 @@ export function Sidebar({
   const baasNav = [
     { id: 'mongo' as ActiveTab, label: '🍃 AetherDoc Store', icon: FileJson, color: 'text-emerald-400', badge: 'JSON' },
     { id: 'auth' as ActiveTab, label: '🛡️ AetherAuth & RLS', icon: ShieldCheck, color: 'text-amber-400', badge: 'Auth' },
+    { id: 'email' as ActiveTab, label: '📧 Email & OTP Studio', icon: Mail, color: 'text-rose-400', badge: 'Gmail' },
     { id: 'storage' as ActiveTab, label: '📦 AetherVault Storage', icon: FolderArchive, color: 'text-cyan-400', badge: 'Buckets' },
     { id: 'realtime' as ActiveTab, label: '⚡ AetherLive Stream', icon: Radio, color: 'text-emerald-400', badge: 'Live' },
   ];

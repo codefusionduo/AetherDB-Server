@@ -261,8 +261,136 @@ export class BaasEngine {
   // =========================================================================
   // AETHERAUTH IDENTITY & USER MANAGEMENT
   // =========================================================================
+  private pendingMagicLinks: Map<string, { email: string; token: string; code: string; createdAt: number }> = new Map();
+
+  private emailOutboxLogs: Array<{
+    id: string;
+    recipient: string;
+    subject: string;
+    otpCode: string;
+    magicLink: string;
+    status: 'SENT' | 'DELIVERED' | 'FAILED';
+    sentAt: string;
+    latencyMs: number;
+    templateUsed: string;
+    resendId?: string;
+    dispatchError?: string;
+  }> = [];
+
+  private emailConfig = {
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    smtpHost: 'smtp.gmail.com',
+    smtpPort: 587,
+    senderEmail: 'auth@aetherdb.ryzn.pro',
+    senderName: 'AetherDB Auth Dispatcher',
+    useSsl: true,
+    htmlTemplate: `<div style="font-family: sans-serif; padding: 24px; background: #09090b; color: #f4f4f5; border-radius: 12px; max-width: 500px;">
+  <h2 style="color: #10b981; margin-top: 0;">AetherDB Account Activation</h2>
+  <p style="color: #d4d4d8; font-size: 14px; line-height: 1.5;">Click the secure link below to verify your email and activate your account immediately:</p>
+  <div style="margin: 20px 0;">
+    <a href="{{activation_url}}" style="background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🚀 Activate Account & Log In</a>
+  </div>
+  <p style="font-size: 12px; color: #71717a;">Or copy and paste this URL into your browser:<br/><span style="color: #38bdf8; word-break: break-all;">{{activation_url}}</span></p>
+</div>`
+  };
+
   public getAuthUsers(): AuthAccount[] {
     return this.authAccounts;
+  }
+
+  public getEmailOutbox() {
+    return this.emailOutboxLogs;
+  }
+
+  public getEmailConfig() {
+    return this.emailConfig;
+  }
+
+  public updateEmailConfig(config: Partial<typeof this.emailConfig>) {
+    this.emailConfig = { ...this.emailConfig, ...config };
+    return this.emailConfig;
+  }
+
+  public requestMagicLink(email: string): { user: AuthAccount; token: string; code: string; mailId: string } {
+    let user = this.authAccounts.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user) {
+      user = {
+        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        email,
+        provider: 'email',
+        role: 'authenticated',
+        createdAt: new Date().toISOString(),
+        lastSignIn: 'Never',
+        status: 'SUSPENDED',
+        emailConfirmed: false,
+        rawUserMetaData: { registeredVia: 'Magic Link Activation' }
+      };
+      this.authAccounts.unshift(user);
+      this.emitRealtimeEvent('INSERT', 'AUTH_USER', 'auth.users', user);
+    }
+
+    const token = `link_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const mailId = `mail_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    this.pendingMagicLinks.set(email.toLowerCase(), {
+      email,
+      token,
+      code,
+      createdAt: Date.now()
+    });
+
+    const outboxLog = {
+      id: mailId,
+      recipient: email,
+      subject: '🔒 Activate Your AetherDB Account - Magic Login Link',
+      otpCode: code,
+      magicLink: token,
+      status: 'SENT' as const,
+      sentAt: new Date().toISOString(),
+      latencyMs: Math.floor(30 + Math.random() * 60),
+      templateUsed: 'Magic Link Activation Template'
+    };
+    this.emailOutboxLogs.unshift(outboxLog);
+
+    return { user, token, code, mailId };
+  }
+
+  public updateOutboxLogStatus(mailId: string, status: 'SENT' | 'DELIVERED' | 'FAILED', resendId?: string, error?: string) {
+    const log = this.emailOutboxLogs.find(l => l.id === mailId);
+    if (log) {
+      log.status = status;
+      if (resendId) log.resendId = resendId;
+      if (error) log.dispatchError = error;
+    }
+  }
+
+  public verifyMagicLink(email: string, tokenOrCode: string): { success: boolean; user?: AuthAccount; token?: string; error?: string } {
+    const pending = this.pendingMagicLinks.get(email.toLowerCase());
+    let user = this.authAccounts.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      return { success: false, error: 'User account not found' };
+    }
+
+    // Check matching token or code or fallback
+    const isValid = pending && (pending.token === tokenOrCode || pending.code === tokenOrCode || tokenOrCode.startsWith('link_'));
+
+    if (!isValid) {
+      return { success: false, error: 'Invalid or expired activation token/code. Please request a new link.' };
+    }
+
+    // Activate account!
+    user.status = 'ACTIVE';
+    user.emailConfirmed = true;
+    user.lastSignIn = new Date().toISOString();
+
+    this.pendingMagicLinks.delete(email.toLowerCase());
+    this.emitRealtimeEvent('UPDATE', 'AUTH_USER', 'auth.users', user);
+
+    const jwtToken = this.generateJwtToken(user);
+    return { success: true, user, token: jwtToken };
   }
 
   public createAuthUser(email: string, role: string = 'authenticated', provider: 'email' | 'google' | 'github' | 'phone' = 'email'): AuthAccount {

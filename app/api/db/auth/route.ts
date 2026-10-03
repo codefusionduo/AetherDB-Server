@@ -6,7 +6,9 @@ export async function GET() {
     const baas = getBaasEngine();
     const users = baas.getAuthUsers();
     const policies = baas.getRlsPolicies();
-    return NextResponse.json({ success: true, users, policies });
+    const emailOutbox = baas.getEmailOutbox();
+    const emailConfig = baas.getEmailConfig();
+    return NextResponse.json({ success: true, users, policies, emailOutbox, emailConfig });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -24,6 +26,120 @@ export async function POST(req: NextRequest) {
       }
       const user = baas.createAuthUser(email, role || 'authenticated', provider || 'email');
       return NextResponse.json({ success: true, user });
+    }
+
+    if (action === 'request_magic_link') {
+      if (!email) {
+        return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
+      }
+      const { user, token, code, mailId } = baas.requestMagicLink(email);
+      
+      const requestOrigin = req.headers.get('origin') || (req.nextUrl.origin !== 'null' ? req.nextUrl.origin : '');
+      const origin = process.env.APP_URL || (requestOrigin && !requestOrigin.includes('localhost') ? requestOrigin : 'https://aetherdb.ryzn.pro');
+      const activationUrl = `${origin}/?activationToken=${token}&email=${encodeURIComponent(email)}`;
+      const config = baas.getEmailConfig();
+      const resendKey = process.env.RESEND_API_KEY || config.resendApiKey;
+
+      let resendDelivery = null;
+      if (resendKey) {
+        const htmlBody = config.htmlTemplate
+          .replace(/{{activation_url}}/g, activationUrl)
+          .replace(/{{otp_code}}/g, code)
+          .replace(/{{user_email}}/g, email);
+
+        const primaryFrom = config.senderEmail && config.senderEmail !== 'onboarding@resend.dev'
+          ? config.senderEmail
+          : 'AetherDB Auth <auth@aetherdb.ryzn.pro>';
+
+        try {
+          let resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: primaryFrom,
+              to: [email],
+              subject: '🔒 Activate Your AetherDB Account - Magic Login Link',
+              html: htmlBody
+            })
+          });
+
+          let resendData = await resendRes.json();
+
+          // Fallback to onboarding@resend.dev if custom domain is not yet verified in Resend
+          if (!resendRes.ok && (resendData?.message?.includes('domain') || resendData?.message?.includes('verify') || resendRes.status === 403 || resendRes.status === 422)) {
+            console.log('Custom domain not verified yet in Resend, falling back to onboarding@resend.dev');
+            resendRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: 'AetherDB Auth <onboarding@resend.dev>',
+                to: [email],
+                subject: '🔒 Activate Your AetherDB Account - Magic Login Link',
+                html: htmlBody
+              })
+            });
+            resendData = await resendRes.json();
+          }
+
+          if (resendRes.ok && resendData.id) {
+            baas.updateOutboxLogStatus(mailId, 'DELIVERED', resendData.id);
+            resendDelivery = { status: 'DELIVERED', resendId: resendData.id };
+          } else {
+            const errMsg = resendData.message || JSON.stringify(resendData);
+            baas.updateOutboxLogStatus(mailId, 'FAILED', undefined, errMsg);
+            resendDelivery = { status: 'FAILED', error: errMsg };
+          }
+        } catch (err: any) {
+          baas.updateOutboxLogStatus(mailId, 'FAILED', undefined, err.message);
+          resendDelivery = { status: 'FAILED', error: err.message };
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        user,
+        token,
+        code,
+        mailId,
+        resendDelivery,
+        message: `Magic activation link dispatched to ${email}`
+      });
+    }
+
+    if (action === 'verify_magic_link') {
+      const { token, code } = body;
+      const verifyInput = token || code;
+      if (!email || !verifyInput) {
+        return NextResponse.json({ success: false, error: 'Email and token/code required' }, { status: 400 });
+      }
+      const res = baas.verifyMagicLink(email, verifyInput);
+      if (!res.success) {
+        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        user: res.user,
+        token: res.token,
+        message: 'Account activated & logged in successfully!'
+      });
+    }
+
+    if (action === 'check_status') {
+      if (!email) {
+        return NextResponse.json({ success: false, error: 'Email required' }, { status: 400 });
+      }
+      const users = baas.getAuthUsers();
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (user && user.status === 'ACTIVE') {
+        return NextResponse.json({ success: true, activated: true, user, token: `session_${user.id}` });
+      }
+      return NextResponse.json({ success: true, activated: false });
     }
 
     if (action === 'toggle_status') {
@@ -61,6 +177,12 @@ export async function POST(req: NextRequest) {
       }
       const ok = baas.toggleRlsPolicy(id);
       return NextResponse.json({ success: ok });
+    }
+
+    if (action === 'update_email_config') {
+      const { config } = body;
+      const updated = baas.updateEmailConfig(config || {});
+      return NextResponse.json({ success: true, emailConfig: updated });
     }
 
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });

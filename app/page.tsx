@@ -14,11 +14,28 @@ import { MongoStudio } from '@/components/db-server/mongo-studio';
 import { AuthStudio } from '@/components/db-server/auth-studio';
 import { StorageStudio } from '@/components/db-server/storage-studio';
 import { RealtimeStudio } from '@/components/db-server/realtime-studio';
+import { EmailStudio } from '@/components/db-server/email-studio';
 import { CreateDbModal } from '@/components/db-server/create-db-modal';
 import { CreateTableModal } from '@/components/db-server/create-table-modal';
+import { LoginGate } from '@/components/auth/login-gate';
 import { ServerMetrics, QueryLogEntry, DatabaseUser, ColumnDefinition, QueryResult } from '@/lib/db-server/types';
 
 export default function DatabaseServerApp() {
+  const [currentUser, setCurrentUser] = useState<{ email: string; token: string; id: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSession = localStorage.getItem('aether_user_session');
+        if (savedSession) {
+          const parsed = JSON.parse(savedSession);
+          if (parsed && parsed.email) return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse session', e);
+      }
+    }
+    return null;
+  });
+
   const [currentDb, setCurrentDb] = useState<string>('main_db');
   const [databases, setDatabases] = useState<string[]>(['main_db']);
   const [tables, setTables] = useState<{ name: string; rowCount: number }[]>([]);
@@ -35,6 +52,20 @@ export default function DatabaseServerApp() {
   // Modals
   const [showCreateDbModal, setShowCreateDbModal] = useState(false);
   const [showCreateTableModal, setShowCreateTableModal] = useState(false);
+
+  const handleSuccessLogin = (user: { email: string; token: string; id: string }) => {
+    setCurrentUser(user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aether_user_session', JSON.stringify(user));
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('aether_user_session');
+    }
+  };
 
   // Initial load
   useEffect(() => {
@@ -344,6 +375,10 @@ export default function DatabaseServerApp() {
     loadMetrics();
   };
 
+  if (!currentUser) {
+    return <LoginGate onSuccessLogin={handleSuccessLogin} />;
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30">
       {/* Top Header */}
@@ -358,6 +393,8 @@ export default function DatabaseServerApp() {
         onResetSeed={handleResetSeed}
         onClearData={handleClearData}
         isBenchmarking={isBenchmarking}
+        userEmail={currentUser.email}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace */}
@@ -431,6 +468,10 @@ export default function DatabaseServerApp() {
 
           {activeTab === 'realtime' && (
             <RealtimeStudio />
+          )}
+
+          {activeTab === 'email' && (
+            <EmailStudio />
           )}
 
           {activeTab === 'metrics' && (

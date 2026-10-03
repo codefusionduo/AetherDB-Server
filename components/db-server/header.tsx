@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Database, Server, Copy, Check, Terminal, Download, RefreshCw, Zap, Trash2 } from 'lucide-react';
+import { Database, Server, Copy, Check, Terminal, Download, RefreshCw, Zap, Trash2, LogOut, UserCheck } from 'lucide-react';
 import { ServerMetrics } from '@/lib/db-server/types';
 
 interface HeaderProps {
@@ -15,6 +15,8 @@ interface HeaderProps {
   onResetSeed: () => void;
   onClearData: () => void;
   isBenchmarking: boolean;
+  userEmail?: string;
+  onLogout?: () => void;
 }
 
 export function Header({
@@ -27,7 +29,9 @@ export function Header({
   onExportDump,
   onResetSeed,
   onClearData,
-  isBenchmarking
+  isBenchmarking,
+  userEmail,
+  onLogout
 }: HeaderProps) {
   const [copied, setCopied] = useState(false);
 
@@ -155,6 +159,25 @@ export function Header({
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
+
+        {/* Logged in user info & Logout */}
+        {userEmail && (
+          <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[11px] font-mono text-emerald-300">
+              <UserCheck className="h-3 w-3 text-emerald-400" />
+              <span className="truncate max-w-[140px]">{userEmail}</span>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title="Log Out & Return to Login Screen"
+                className="p-1.5 bg-zinc-900 hover:bg-rose-500/10 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-500/30 rounded-md transition-colors"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

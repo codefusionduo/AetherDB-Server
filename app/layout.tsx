@@ -2,11 +2,14 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'AetherDB — High Performance Database Server & Studio',
-  description: 'An all-in-one relational and document database server engine with live SQL console, table visualizer, ER diagram modeler, REST API endpoints, and real-time server telemetry.',
+  metadataBase: new URL('https://aetherdb.ryzn.pro'),
+  title: 'AetherDB — High Performance Database Server & Studio (aetherdb.ryzn.pro)',
+  description: 'An all-in-one relational and document database server engine hosted at aetherdb.ryzn.pro with live SQL console, table visualizer, ER diagram modeler, REST API endpoints, and real-time server telemetry.',
   openGraph: {
     title: 'AetherDB — High Performance Database Server & Studio',
-    description: 'An all-in-one relational and document database server engine with live SQL console, table visualizer, ER diagram modeler, REST API endpoints, and real-time server telemetry.',
+    description: 'An all-in-one relational and document database server engine hosted at aetherdb.ryzn.pro.',
+    url: 'https://aetherdb.ryzn.pro',
+    siteName: 'AetherDB',
     type: 'website',
   },
   twitter: {
