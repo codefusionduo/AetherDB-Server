@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Database, Server, Copy, Check, Terminal, Download, RefreshCw, Zap, Trash2, LogOut, UserCheck } from 'lucide-react';
 import { ServerMetrics } from '@/lib/db-server/types';
+import { ThreeLogo } from '@/components/ui/three-logo';
 
 interface HeaderProps {
   currentDb: string;
@@ -47,10 +48,8 @@ export function Header({
     <header className="border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 text-zinc-100 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30">
       {/* Brand & Instance Info */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-            <Server className="h-4 w-4" />
-          </div>
+        <div className="flex items-center gap-2">
+          <ThreeLogo size="sm" interactive={true} glow={true} />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm tracking-tight text-white">AetherDB Server</span>

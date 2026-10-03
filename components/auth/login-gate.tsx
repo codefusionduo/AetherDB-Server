@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
+import { ThreeLogo } from '@/components/ui/three-logo';
 
 interface LoginGateProps {
   onSuccessLogin: (user: { email: string; token: string; id: string }) => void;
@@ -213,14 +214,14 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
         
         {/* Logo & Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-zinc-950 shadow-lg shadow-emerald-500/20 mb-2">
-            <Database className="h-6 w-6 stroke-[2.5]" />
+          <div className="flex justify-center mb-1">
+            <ThreeLogo size="lg" interactive={true} glow={true} />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-            AetherDB Console
+            AetherDB
           </h1>
           <p className="text-xs text-zinc-400">
-            Gmail Magic Link & Email Account Activation Gate
+            Gmail Magic Link & Real-Time Account Activation Gate
           </p>
         </div>
 
@@ -236,9 +237,8 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
         {step === 'input' && (
           <form onSubmit={handleRequestLink} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                <span>Enter Your Email / Gmail Address</span>
-                <span className="text-[10px] text-emerald-400 font-normal">Magic Link Required</span>
+              <label className="text-xs font-semibold text-zinc-300 block">
+                Enter Your Email / Gmail Address
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />

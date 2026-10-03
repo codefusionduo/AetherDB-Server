@@ -18,6 +18,7 @@ import {
   Radio,
   Mail
 } from 'lucide-react';
+import { ThreeLogo } from '@/components/ui/three-logo';
 
 export type ActiveTab =
   | 'console'
@@ -209,6 +210,20 @@ export function Sidebar({
               );
             })}
           </nav>
+        </div>
+      </div>
+
+      {/* 3D Core Cluster Badge */}
+      <div className="p-3 border-t border-zinc-850/80 bg-zinc-950/70">
+        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/30 transition-all">
+          <ThreeLogo size="xs" interactive={true} glow={true} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-zinc-200">3D AetherCore</span>
+              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400">v2.4</span>
+            </div>
+            <p className="text-[10px] text-zinc-500 truncate">Three.js Engine Synced</p>
+          </div>
         </div>
       </div>
     </aside>
