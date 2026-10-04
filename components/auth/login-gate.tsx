@@ -6,6 +6,7 @@ import {
   Mail,
   Lock,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Copy,
@@ -14,9 +15,11 @@ import {
   ShieldCheck,
   Loader2,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Rocket
 } from 'lucide-react';
 import { ThreeLogo } from '@/components/ui/three-logo';
+import { safeFetchJson } from '@/lib/utils';
 
 interface LoginGateProps {
   onSuccessLogin: (user: { email: string; token: string; id: string }) => void;
@@ -24,7 +27,7 @@ interface LoginGateProps {
 
 export function LoginGate({ onSuccessLogin }: LoginGateProps) {
   const [email, setEmail] = useState('');
-  const [step, setStep] = useState<'input' | 'sent' | 'activating'>('input');
+  const [step, setStep] = useState<'input' | 'sent' | 'activating' | 'redirected_to_last_window'>('input');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activationToken, setActivationToken] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
   const [resendCooldown, setResendCooldown] = useState(30);
   const [resendSuccessMsg, setResendSuccessMsg] = useState<string | null>(null);
   const [resendDeliveryInfo, setResendDeliveryInfo] = useState<{ status: string; resendId?: string; error?: string } | null>(null);
+  const [activatedUser, setActivatedUser] = useState<{ email: string; token: string; id: string } | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -46,29 +50,77 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
     };
   }, [step, resendCooldown]);
 
+  // Multi-channel cross-window sync listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. BroadcastChannel (modern multi-tab sync)
+    let channel: BroadcastChannel | null = null;
+    if ('BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('aether_auth_channel');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'AETHER_AUTH_ACTIVATED' && event.data.user) {
+            try { window.focus(); } catch {}
+            onSuccessLogin(event.data.user);
+          }
+        };
+      } catch {}
+    }
+
+    // 2. Storage event (fires across all tabs & windows on same domain)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'aether_magic_login_event' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && parsed.email && parsed.token) {
+            try { window.focus(); } catch {}
+            onSuccessLogin({ email: parsed.email, token: parsed.token, id: parsed.id });
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // 3. Window postMessage (direct communication between opener and popup/new tab)
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'AETHER_AUTH_ACTIVATED' && e.data.user) {
+        try { window.focus(); } catch {}
+        onSuccessLogin(e.data.user);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [onSuccessLogin]);
+
   // Auto-check activation status when waiting for email link click
   useEffect(() => {
     let checkInterval: NodeJS.Timeout;
     if (step === 'sent' && email) {
       checkInterval = setInterval(async () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         try {
-          const res = await fetch('/api/db/auth', {
+          const data = await safeFetchJson('/api/db/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'check_status', email: email.trim() })
           });
-          const data = await res.json();
-          if (data.success && data.activated && data.user) {
+          if (data && data.success && data.activated && data.user) {
             onSuccessLogin({
               email: data.user.email,
               token: data.token,
               id: data.user.id
             });
           }
-        } catch (err) {
+        } catch {
           // ignore transient polling errors
         }
-      }, 2500);
+      }, 3500);
     }
     return () => {
       if (checkInterval) clearInterval(checkInterval);
@@ -81,17 +133,18 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
     setError(null);
     setResendSuccessMsg(null);
     try {
-      const res = await fetch('/api/db/auth', {
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const data = await safeFetchJson('/api/db/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'request_magic_link',
-          email: email.trim()
+          email: email.trim(),
+          clientOrigin
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setActivationToken(data.token);
         setActivationCode(data.code);
         if (data.resendDelivery) setResendDeliveryInfo(data.resendDelivery);
@@ -99,9 +152,9 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
         setResendSuccessMsg(`New magic activation link dispatched to ${email}!`);
         setTimeout(() => setResendSuccessMsg(null), 4000);
       } else {
-        setError(data.error || 'Failed to resend magic link');
+        setError(data?.error || 'Failed to resend magic link');
       }
-    } catch (err) {
+    } catch {
       setError('Network error resending link');
     } finally {
       setLoading(false);
@@ -112,7 +165,7 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/db/auth', {
+      const data = await safeFetchJson('/api/db/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,18 +175,59 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
         })
       });
 
-      const data = await res.json();
-      if (data.success && data.user) {
-        onSuccessLogin({
+      if (data && data.success && data.user) {
+        const authData = {
           email: data.user.email,
           token: data.token,
           id: data.user.id
-        });
+        };
+        setActivatedUser(authData);
+
+        // 1. Broadcast to any other open tabs/windows
+        if (typeof window !== 'undefined') {
+          try {
+            if ('BroadcastChannel' in window) {
+              const bc = new BroadcastChannel('aether_auth_channel');
+              bc.postMessage({ type: 'AETHER_AUTH_ACTIVATED', user: authData });
+              setTimeout(() => bc.close(), 1000);
+            }
+          } catch {}
+
+          try {
+            localStorage.setItem('aether_magic_login_event', JSON.stringify({ ...authData, timestamp: Date.now() }));
+          } catch {}
+
+          try {
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({ type: 'AETHER_AUTH_ACTIVATED', user: authData }, '*');
+              try { window.opener.focus(); } catch {}
+            }
+          } catch {}
+        }
+
+        // Check if we arrived here via activation link in URL
+        const isFromExternalLink = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('activationToken');
+
+        if (isFromExternalLink) {
+          // User clicked from email -> show confirmation and move back to previous/last window
+          setStep('redirected_to_last_window');
+          setTimeout(() => {
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.focus();
+              }
+              window.close();
+            } catch {}
+          }, 1500);
+        } else {
+          // User activated directly in this window
+          onSuccessLogin(authData);
+        }
       } else {
-        setError(data.error || 'Verification failed. Account is not active.');
+        setError(data?.error || 'Verification failed. Account is not active.');
         setStep('sent');
       }
-    } catch (err: any) {
+    } catch {
       setError('Failed to verify magic link');
       setStep('sent');
     } finally {
@@ -168,34 +262,35 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/db/auth', {
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const data = await safeFetchJson('/api/db/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'request_magic_link',
-          email: email.trim()
+          email: email.trim(),
+          clientOrigin
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setActivationToken(data.token);
         setActivationCode(data.code);
         if (data.resendDelivery) setResendDeliveryInfo(data.resendDelivery);
         setStep('sent');
       } else {
-        setError(data.error || 'Failed to send activation link');
+        setError(data?.error || 'Failed to send activation link');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error sending magic link');
+      setError(err?.message || 'Network error sending magic link');
     } finally {
       setLoading(false);
     }
   };
 
-  const domainOrigin = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'https://aetherdb.ryzn.pro'
-    : (typeof window !== 'undefined' ? window.location.origin : 'https://aetherdb.ryzn.pro');
+  const domainOrigin = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'https://aetherdb.ryzn.pro';
 
   const fullActivationUrl = `${domainOrigin}/?activationToken=${activationToken}&email=${encodeURIComponent(email)}`;
 
@@ -266,7 +361,7 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
             >
               {loading ? (
                 <>
@@ -343,15 +438,33 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
                   <span>Check Your Inbox: <strong className="text-white">{email}</strong></span>
                 </div>
                 <p className="text-[11px] text-zinc-300 leading-relaxed">
-                  A magic activation link has been sent to your Gmail address. <strong className="text-emerald-300">Open your email app, find the email from AetherDB Auth, and click the activation link.</strong>
+                  A magic activation link has been sent to your Gmail address. Click the activation link in your email, or activate immediately right here.
                 </p>
                 <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
                   <span className="flex items-center gap-1.5 text-emerald-400">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Auto-detecting activation status...</span>
+                    <span>Auto-syncing activation across tabs...</span>
                   </span>
                   <span className="text-[10px] text-zinc-500 font-mono">auth@aetherdb.ryzn.pro</span>
                 </div>
+              </div>
+
+              {/* Direct In-Window Activation Button */}
+              <div className="pt-2 border-t border-zinc-800/80 space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('activating');
+                    handleDirectVerify(email, activationToken || '');
+                  }}
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <Rocket className="h-4 w-4" />
+                  <span>🚀 Activate Account & Log In (In This Window)</span>
+                </button>
+                <p className="text-[10px] text-zinc-400 text-center">
+                  Click to log in directly inside this window without opening a new tab
+                </p>
               </div>
             </div>
 
@@ -369,7 +482,7 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
                 type="button"
                 onClick={handleResendLink}
                 disabled={resendCooldown > 0 || loading}
-                className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-400 text-[11px] font-semibold rounded-xl flex items-center gap-1.5 transition-all"
+                className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-400 text-[11px] font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
                 <span>
@@ -383,7 +496,7 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
                 setStep('input');
                 setError(null);
               }}
-              className="w-full text-center text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors pt-2"
+              className="w-full text-center text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors pt-2 cursor-pointer"
             >
               ← Use a different email address
             </button>
@@ -400,6 +513,62 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
             <p className="text-[11px] text-zinc-400">
               Setting up your active session for {email}
             </p>
+          </div>
+        )}
+
+        {/* STEP 4: Redirected / Moved to Last Window */}
+        {step === 'redirected_to_last_window' && (
+          <div className="py-6 text-center space-y-5 animate-fadeIn">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="text-base font-bold text-zinc-100 flex items-center justify-center gap-2">
+                <span>🚀 Account Activated!</span>
+              </h2>
+              <p className="text-xs text-zinc-300">
+                Aapka account verify aur activate ho chuka hai.
+              </p>
+              <p className="text-[11px] text-emerald-400 font-medium">
+                Aapki pichli (last) window par session move kar diya gaya hai!
+              </p>
+            </div>
+
+            <div className="p-3 bg-zinc-950/80 border border-zinc-800/80 rounded-xl text-xs text-zinc-400 flex items-center justify-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+              <span>Moving back to your last window...</span>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (window.opener && !window.opener.closed) {
+                      window.opener.focus();
+                    }
+                    window.close();
+                  } catch {}
+                }}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Move to Last Window (Pichli Window Par Jayein)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (activatedUser) {
+                    onSuccessLogin(activatedUser);
+                  }
+                }}
+                className="w-full py-2 px-3 text-zinc-400 hover:text-zinc-200 text-[11px] font-medium transition-colors cursor-pointer"
+              >
+                Or continue in this window instead
+              </button>
+            </div>
           </div>
         )}
 

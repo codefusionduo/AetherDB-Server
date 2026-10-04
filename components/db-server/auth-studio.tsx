@@ -22,6 +22,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { AuthAccount, RlsPolicy } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 export function AuthStudio() {
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'rls'>('users');
@@ -48,14 +49,11 @@ export function AuthStudio() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/db/auth');
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeFetchJson('/api/db/auth');
+      if (data?.success) {
         setUsers(data.users || []);
         setPolicies(data.policies || []);
       }
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -63,15 +61,12 @@ export function AuthStudio() {
 
   useEffect(() => {
     let isCancelled = false;
-    fetch('/api/db/auth')
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success) {
-          setUsers(data.users || []);
-          setPolicies(data.policies || []);
-        }
-      })
-      .catch(console.error);
+    safeFetchJson('/api/db/auth').then((data) => {
+      if (!isCancelled && data?.success) {
+        setUsers(data.users || []);
+        setPolicies(data.policies || []);
+      }
+    });
 
     return () => { isCancelled = true; };
   }, []);

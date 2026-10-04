@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { RealtimeEvent } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 export function RealtimeStudio() {
   const [events, setEvents] = useState<RealtimeEvent[]>([]);
@@ -26,40 +27,28 @@ export function RealtimeStudio() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchEvents = async () => {
-    try {
-      const res = await fetch('/api/db/realtime');
-      const data = await res.json();
-      if (data.success && data.events) {
-        setEvents(data.events);
-      }
-    } catch (err) {
-      console.error(err);
+    const data = await safeFetchJson('/api/db/realtime');
+    if (data?.success && data.events) {
+      setEvents(data.events);
     }
   };
 
   useEffect(() => {
     let isCancelled = false;
 
-    fetch('/api/db/realtime')
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success && data.events) {
-          setEvents(data.events);
-        }
-      })
-      .catch(console.error);
+    safeFetchJson('/api/db/realtime').then((data) => {
+      if (!isCancelled && data?.success && data.events) {
+        setEvents(data.events);
+      }
+    });
 
-    // Poll every 2 seconds for live changes
-    const interval = setInterval(() => {
-      fetch('/api/db/realtime')
-        .then(res => res.json())
-        .then(data => {
-          if (!isCancelled && data.success && data.events) {
-            setEvents(data.events);
-          }
-        })
-        .catch(console.error);
-    }, 2000);
+    // Poll every 5 seconds for live changes
+    const interval = setInterval(async () => {
+      const data = await safeFetchJson('/api/db/realtime');
+      if (!isCancelled && data?.success && data.events) {
+        setEvents(data.events);
+      }
+    }, 5000);
 
     return () => {
       isCancelled = true;

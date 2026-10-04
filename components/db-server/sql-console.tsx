@@ -26,10 +26,8 @@ interface SQLConsoleProps {
 
 export function SQLConsole({ currentDb, onExecuteQuery, tables }: SQLConsoleProps) {
   const getInitialQuery = () => {
-    if (currentDb === 'ecommerce_prod') {
-      return 'SELECT customers.full_name, customers.country, orders.order_number, orders.total_amount\nFROM orders\nJOIN customers ON orders.customer_id = customers.id\nORDER BY orders.total_amount DESC;';
-    } else if (currentDb === 'analytics_logs') {
-      return 'SELECT endpoint, http_method, status_code, latency_ms\nFROM request_events\nWHERE status_code = 200\nORDER BY latency_ms DESC\nLIMIT 10;';
+    if (currentDb === 'aetherdb') {
+      return 'SELECT users.id, users.name, users.email, users.role, projects.name AS project, projects.environment\nFROM users\nJOIN projects ON projects.owner_id = users.id;';
     } else if (tables.length > 0) {
       return `SELECT * FROM ${tables[0].name} LIMIT 10;`;
     }

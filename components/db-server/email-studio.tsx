@@ -17,6 +17,7 @@ import {
   Sparkles,
   Search
 } from 'lucide-react';
+import { safeFetchJson } from '@/lib/utils';
 
 export function EmailStudio() {
   const [activeTab, setActiveTab] = useState<'outbox' | 'templates' | 'smtp'>('outbox');
@@ -41,7 +42,7 @@ export function EmailStudio() {
   <h2 style="color: #10b981; margin-top: 0;">AetherDB Account Activation</h2>
   <p style="font-size: 14px; color: #d4d4d8; line-height: 1.5;">Click the secure link below to verify your email and complete account login:</p>
   <div style="margin: 20px 0;">
-    <a href="{{activation_url}}" style="background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🚀 Activate Account & Sign In</a>
+    <a href="{{activation_url}}" target="_self" style="background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🚀 Activate Account & Log In</a>
   </div>
   <p style="font-size: 12px; color: #71717a; margin-top: 20px;">Or copy and paste this URL into your browser:<br/><span style="color: #38bdf8; word-break: break-all;">{{activation_url}}</span></p>
 </div>`);
@@ -49,21 +50,20 @@ export function EmailStudio() {
   const fetchEmailData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/db/auth');
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeFetchJson('/api/db/auth');
+      if (data?.success) {
         if (data.emailOutbox) setOutbox(data.emailOutbox);
         if (data.emailConfig) {
           if (data.emailConfig.resendApiKey) setResendApiKey(data.emailConfig.resendApiKey);
           setSmtpHost(data.emailConfig.smtpHost || 'smtp.gmail.com');
           setSmtpPort(data.emailConfig.smtpPort?.toString() || '587');
-          setSenderEmail(data.emailConfig.senderEmail || 'onboarding@resend.dev');
-          setSenderName(data.emailConfig.senderName || 'AetherDB Auth Dispatcher');
+          const rawSender = data.emailConfig.senderEmail || 'auth@aetherdb.ryzn.pro';
+          const emailMatch = rawSender.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          setSenderEmail(emailMatch ? emailMatch[1] : 'auth@aetherdb.ryzn.pro');
+          setSenderName(data.emailConfig.senderName || 'AetherDB');
           if (data.emailConfig.htmlTemplate) setHtmlTemplate(data.emailConfig.htmlTemplate);
         }
       }
-    } catch (err) {
-      console.error('Failed to load email outbox', err);
     } finally {
       setLoading(false);
     }

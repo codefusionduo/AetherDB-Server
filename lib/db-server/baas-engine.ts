@@ -281,14 +281,14 @@ export class BaasEngine {
     resendApiKey: process.env.RESEND_API_KEY || '',
     smtpHost: 'smtp.gmail.com',
     smtpPort: 587,
-    senderEmail: process.env.RESEND_FROM || 'AetherDB <auth@aetherdb.ryzn.pro>',
-    senderName: 'AetherDB Auth Dispatcher',
+    senderEmail: 'auth@aetherdb.ryzn.pro',
+    senderName: 'AetherDB',
     useSsl: true,
     htmlTemplate: `<div style="font-family: sans-serif; padding: 24px; background: #09090b; color: #f4f4f5; border-radius: 12px; max-width: 500px;">
   <h2 style="color: #10b981; margin-top: 0;">AetherDB Account Activation</h2>
   <p style="color: #d4d4d8; font-size: 14px; line-height: 1.5;">Click the secure link below to verify your email and activate your account immediately:</p>
   <div style="margin: 20px 0;">
-    <a href="{{activation_url}}" style="background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🚀 Activate Account & Log In</a>
+    <a href="{{activation_url}}" target="_self" style="background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🚀 Activate Account & Log In</a>
   </div>
   <p style="font-size: 12px; color: #71717a;">Or copy and paste this URL into your browser:<br/><span style="color: #38bdf8; word-break: break-all;">{{activation_url}}</span></p>
 </div>`

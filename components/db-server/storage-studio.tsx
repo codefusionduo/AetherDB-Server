@@ -20,6 +20,7 @@ import {
   Lock
 } from 'lucide-react';
 import { StorageBucket, StorageFile } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 export function StorageStudio() {
   const [buckets, setBuckets] = useState<StorageBucket[]>([]);
@@ -40,17 +41,12 @@ export function StorageStudio() {
   const [newFileSizeKb, setNewFileSizeKb] = useState(128);
 
   const fetchBuckets = async () => {
-    try {
-      const res = await fetch('/api/db/storage');
-      const data = await res.json();
-      if (data.success && data.buckets) {
-        setBuckets(data.buckets);
-        if (data.buckets.length > 0 && !activeBucket) {
-          setActiveBucket(data.buckets[0].id);
-        }
+    const data = await safeFetchJson('/api/db/storage');
+    if (data?.success && data.buckets) {
+      setBuckets(data.buckets);
+      if (data.buckets.length > 0 && !activeBucket) {
+        setActiveBucket(data.buckets[0].id);
       }
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -58,13 +54,10 @@ export function StorageStudio() {
     if (!bucketId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/db/storage?bucket=${bucketId}`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeFetchJson(`/api/db/storage?bucket=${bucketId}`);
+      if (data?.success) {
         setFiles(data.files || []);
       }
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -72,17 +65,14 @@ export function StorageStudio() {
 
   useEffect(() => {
     let isCancelled = false;
-    fetch('/api/db/storage')
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success && data.buckets) {
-          setBuckets(data.buckets);
-          if (data.buckets.length > 0 && !activeBucket) {
-            setActiveBucket(data.buckets[0].id);
-          }
+    safeFetchJson('/api/db/storage').then((data) => {
+      if (!isCancelled && data?.success && data.buckets) {
+        setBuckets(data.buckets);
+        if (data.buckets.length > 0 && !activeBucket) {
+          setActiveBucket(data.buckets[0].id);
         }
-      })
-      .catch(console.error);
+      }
+    });
 
     return () => { isCancelled = true; };
   }, [activeBucket]);
@@ -90,14 +80,11 @@ export function StorageStudio() {
   useEffect(() => {
     if (!activeBucket) return;
     let isCancelled = false;
-    fetch(`/api/db/storage?bucket=${activeBucket}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success) {
-          setFiles(data.files || []);
-        }
-      })
-      .catch(console.error);
+    safeFetchJson(`/api/db/storage?bucket=${activeBucket}`).then((data) => {
+      if (!isCancelled && data?.success) {
+        setFiles(data.files || []);
+      }
+    });
 
     return () => { isCancelled = true; };
   }, [activeBucket]);

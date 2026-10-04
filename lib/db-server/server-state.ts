@@ -72,8 +72,8 @@ if (!global._queryAuditLogs) {
     {
       id: 'qlog_init',
       timestamp: new Date().toLocaleTimeString(),
-      database: 'main_db',
-      sql: 'AETHERDB ENGINE STARTED -- Clean database mounted (main_db)',
+      database: 'aetherdb',
+      sql: 'AETHERDB ENGINE STARTED -- Database mounted (aetherdb)',
       executionTimeMs: 0.5,
       rowsAffected: 0,
       status: 'SUCCESS',
@@ -88,6 +88,15 @@ if (!global._totalQueriesCount) {
 
 if (!global._databaseUsersList) {
   global._databaseUsersList = [
+    {
+      id: 'usr_yabhi',
+      username: 'yabhi9435@gmail.com',
+      role: 'SUPERUSER',
+      databaseAccess: ['*'],
+      createdAt: new Date().toISOString(),
+      apiKey: 'aeth_sk_live_yabhi9435_admin_key',
+      lastLogin: 'Active now'
+    },
     {
       id: 'usr_root',
       username: 'admin',

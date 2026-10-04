@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEngine, logQuery, persistState } from '@/lib/db-server/server-state';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sql, database = 'ecommerce_prod' } = body;
+    const { sql, database = 'aetherdb' } = body;
 
     if (!sql || typeof sql !== 'string') {
       return NextResponse.json(

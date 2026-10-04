@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBaasEngine } from '@/lib/db-server/server-state';
 
+export const dynamic = 'force-dynamic';
+
+function cleanSender(rawInput: string | undefined, defaultName: string = 'AetherDB'): string {
+  if (!rawInput) return 'AetherDB <auth@aetherdb.ryzn.pro>';
+  const str = rawInput.trim().replace(/^["']+|["']+$/g, '').trim();
+  const emailMatch = str.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (!emailMatch) {
+    return 'AetherDB <auth@aetherdb.ryzn.pro>';
+  }
+  const cleanEmail = emailMatch[1].trim();
+  let displayName = defaultName.trim().replace(/^["']+|["']+$/g, '').trim();
+  const namePartMatch = str.match(/^(.*?)\s*<.*>$/);
+  if (namePartMatch && namePartMatch[1].trim()) {
+    const candidateName = namePartMatch[1].replace(/^[<"']+|[>"']+$/g, '').trim();
+    if (candidateName) {
+      displayName = candidateName;
+    }
+  }
+  return `${displayName} <${cleanEmail}>`;
+}
+
 export async function GET() {
   try {
     const baas = getBaasEngine();
@@ -17,7 +38,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, email, role, provider, id, policy } = body;
+    const { action, email, role, provider, id, policy, clientOrigin } = body;
     const baas = getBaasEngine();
 
     if (action === 'create_user') {
@@ -34,8 +55,8 @@ export async function POST(req: NextRequest) {
       }
       const { user, token, code, mailId } = baas.requestMagicLink(email);
       
-      const requestOrigin = req.headers.get('origin') || (req.nextUrl.origin !== 'null' ? req.nextUrl.origin : '');
-      const origin = process.env.APP_URL || (requestOrigin && !requestOrigin.includes('localhost') ? requestOrigin : 'https://aetherdb.ryzn.pro');
+      const requestOrigin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/$/, '') || (req.nextUrl.origin !== 'null' ? req.nextUrl.origin : '');
+      const origin = clientOrigin || process.env.APP_URL || requestOrigin || 'https://aetherdb.ryzn.pro';
       const activationUrl = `${origin}/?activationToken=${token}&email=${encodeURIComponent(email)}`;
       const config = baas.getEmailConfig();
       const resendKey = process.env.RESEND_API_KEY || config.resendApiKey;
@@ -47,11 +68,7 @@ export async function POST(req: NextRequest) {
           .replace(/{{otp_code}}/g, code)
           .replace(/{{user_email}}/g, email);
 
-        const configuredFrom = (process.env.RESEND_FROM || config.senderEmail || 'onboarding@resend.dev').trim();
-        const senderName = config.senderName || 'AetherDB';
-        const primaryFrom = configuredFrom.includes('<') && configuredFrom.includes('>')
-          ? configuredFrom
-          : `${senderName} <${configuredFrom}>`;
+        const primaryFrom = cleanSender(process.env.RESEND_FROM || config.senderEmail, config.senderName || 'AetherDB');
 
         try {
           let resendRes = await fetch('https://api.resend.com/emails', {
@@ -71,7 +88,7 @@ export async function POST(req: NextRequest) {
           let resendData = await resendRes.json();
 
           // Fallback to onboarding@resend.dev if custom domain is not yet verified in Resend
-          if (!resendRes.ok && primaryFrom !== 'AetherDB <onboarding@resend.dev>' && primaryFrom !== 'onboarding@resend.dev') {
+          if (!resendRes.ok && !primaryFrom.includes('onboarding@resend.dev')) {
             console.log('First Resend attempt failed:', resendData?.message, 'Retrying with onboarding@resend.dev');
             resendRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',

@@ -20,6 +20,7 @@ import {
   Database
 } from 'lucide-react';
 import { MongoCollection, MongoDocument } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 export function MongoStudio() {
   const [collections, setCollections] = useState<{ name: string; documentCount: number; createdAt: string; indexes: string[] }[]>([]);
@@ -45,17 +46,14 @@ export function MongoStudio() {
   // Initial load
   useEffect(() => {
     let isCancelled = false;
-    fetch('/api/db/mongo')
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success && data.collections) {
-          setCollections(data.collections);
-          if (data.collections.length > 0 && !activeCollection) {
-            setActiveCollection(data.collections[0].name);
-          }
+    safeFetchJson('/api/db/mongo').then((data) => {
+      if (!isCancelled && data?.success && data.collections) {
+        setCollections(data.collections);
+        if (data.collections.length > 0 && !activeCollection) {
+          setActiveCollection(data.collections[0].name);
         }
-      })
-      .catch(console.error);
+      }
+    });
 
     return () => { isCancelled = true; };
   }, [activeCollection]);
@@ -75,30 +73,21 @@ export function MongoStudio() {
       }
     }
 
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        if (!isCancelled && data.success) {
-          setDocuments(data.documents || []);
-        }
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (!isCancelled) setLoading(false);
-      });
+    safeFetchJson(url).then((data) => {
+      if (!isCancelled && data?.success) {
+        setDocuments(data.documents || []);
+      }
+    }).finally(() => {
+      if (!isCancelled) setLoading(false);
+    });
 
     return () => { isCancelled = true; };
   }, [activeCollection, mongoFilter]);
 
   const refreshCollections = async () => {
-    try {
-      const res = await fetch('/api/db/mongo');
-      const data = await res.json();
-      if (data.success && data.collections) {
-        setCollections(data.collections);
-      }
-    } catch (err) {
-      console.error(err);
+    const data = await safeFetchJson('/api/db/mongo');
+    if (data?.success && data.collections) {
+      setCollections(data.collections);
     }
   };
 
@@ -106,13 +95,10 @@ export function MongoStudio() {
     if (!activeCollection) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/db/mongo?collection=${activeCollection}`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeFetchJson(`/api/db/mongo?collection=${activeCollection}`);
+      if (data?.success) {
         setDocuments(data.documents || []);
       }
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }

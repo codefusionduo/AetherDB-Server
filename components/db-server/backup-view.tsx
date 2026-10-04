@@ -13,6 +13,7 @@ import {
   Trash2,
   Sparkles
 } from 'lucide-react';
+import { safeFetchJson } from '@/lib/utils';
 
 interface BackupViewProps {
   currentDb: string;
@@ -44,18 +45,19 @@ export function BackupView({ currentDb, onResetSeed, onExportDump, onClearData, 
 
   const handleDownloadJson = async () => {
     try {
-      const res = await fetch(`/api/db/backup?database=${currentDb}&format=json`);
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data.dump, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${currentDb}_snapshot_${Date.now()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const data = await safeFetchJson(`/api/db/backup?database=${currentDb}&format=json`);
+      if (data?.dump) {
+        const blob = new Blob([JSON.stringify(data.dump, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${currentDb}_snapshot_${Date.now()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch {
-      alert('Failed to download JSON snapshot');
+      // ignore download error gracefully
     }
   };
 

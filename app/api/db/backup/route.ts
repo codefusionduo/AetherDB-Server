@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEngine, persistState } from '@/lib/db-server/server-state';
 import { INITIAL_DATABASES } from '@/lib/db-server/seed-data';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

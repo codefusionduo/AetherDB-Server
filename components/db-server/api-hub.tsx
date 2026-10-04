@@ -172,10 +172,16 @@ print("AetherDoc Documents:", doc_res.json()["documents"])`
       }
 
       const res = await fetch(testEndpoint, options);
-      const data = await res.json();
-      setTestResponse(JSON.stringify(data, null, 2));
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        setTestResponse(JSON.stringify(data, null, 2));
+      } else {
+        const text = await res.text();
+        setTestResponse(text || `HTTP ${res.status} ${res.statusText}`);
+      }
     } catch (err: any) {
-      setTestResponse(JSON.stringify({ error: err.message }, null, 2));
+      setTestResponse(JSON.stringify({ error: err?.message || 'Request failed' }, null, 2));
     } finally {
       setTesting(false);
     }

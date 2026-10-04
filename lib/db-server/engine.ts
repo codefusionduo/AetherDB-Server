@@ -3,7 +3,7 @@ import { INITIAL_DATABASES } from './seed-data';
 
 export class DatabaseEngine {
   private databases: Record<string, DatabaseData>;
-  private defaultDbName: string = 'main_db';
+  private defaultDbName: string = 'aetherdb';
 
   constructor(initialData?: Record<string, DatabaseData>) {
     if (initialData) {

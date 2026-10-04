@@ -15,6 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { TableSchema, DataType } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 interface SchemaDiagramProps {
   currentDb: string;
@@ -30,13 +31,10 @@ export function SchemaDiagram({ currentDb, onOpenCreateTable, onSelectTable }: S
   const fetchTables = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/db/tables?database=${currentDb}`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeFetchJson(`/api/db/tables?database=${currentDb}`);
+      if (data?.success) {
         setTables(data.tables || []);
       }
-    } catch (err) {
-      console.error('Failed to load tables', err);
     } finally {
       setLoading(false);
     }
@@ -44,16 +42,11 @@ export function SchemaDiagram({ currentDb, onOpenCreateTable, onSelectTable }: S
 
   useEffect(() => {
     let isCancelled = false;
-    fetch(`/api/db/tables?database=${currentDb}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isCancelled && data.success) {
-          setTables(data.tables || []);
-        }
-      })
-      .catch((err) => {
-        if (!isCancelled) console.error('Failed to load tables', err);
-      });
+    safeFetchJson(`/api/db/tables?database=${currentDb}`).then((data) => {
+      if (!isCancelled && data?.success) {
+        setTables(data.tables || []);
+      }
+    });
 
     return () => {
       isCancelled = true;

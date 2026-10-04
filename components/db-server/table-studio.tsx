@@ -20,6 +20,7 @@ import {
   ToggleLeft
 } from 'lucide-react';
 import { TableSchema, DataType } from '@/lib/db-server/types';
+import { safeFetchJson } from '@/lib/utils';
 
 interface TableStudioProps {
   currentDb: string;
@@ -48,22 +49,18 @@ export function TableStudio({ currentDb, tableName, onRefreshTables }: TableStud
   useEffect(() => {
     let isCancelled = false;
     if (!tableName) return;
-    fetch(
-      `/api/db/data?database=${currentDb}&table=${tableName}&search=${encodeURIComponent(
-        search
-      )}&page=${page}&limit=25`
-    )
-      .then((res) => res.json())
+    const url = `/api/db/data?database=${currentDb}&table=${tableName}&search=${encodeURIComponent(
+      search
+    )}&page=${page}&limit=25`;
+
+    safeFetchJson(url)
       .then((data) => {
-        if (!isCancelled && data.success) {
+        if (!isCancelled && data?.success) {
           setSchema(data.schema);
           setRows(data.rows);
           setTotalPages(data.totalPages);
           setTotalCount(data.totalCount);
         }
-      })
-      .catch((err) => {
-        if (!isCancelled) console.error('Failed to load table data', err);
       })
       .finally(() => {
         if (!isCancelled) setLoading(false);
@@ -77,22 +74,18 @@ export function TableStudio({ currentDb, tableName, onRefreshTables }: TableStud
   const fetchTableData = () => {
     if (!tableName) return;
     setLoading(true);
-    fetch(
-      `/api/db/data?database=${currentDb}&table=${tableName}&search=${encodeURIComponent(
-        search
-      )}&page=${page}&limit=25`
-    )
-      .then((res) => res.json())
+    const url = `/api/db/data?database=${currentDb}&table=${tableName}&search=${encodeURIComponent(
+      search
+    )}&page=${page}&limit=25`;
+
+    safeFetchJson(url)
       .then((data) => {
-        if (data.success) {
+        if (data?.success) {
           setSchema(data.schema);
           setRows(data.rows);
           setTotalPages(data.totalPages);
           setTotalCount(data.totalCount);
         }
-      })
-      .catch((err) => {
-        console.error('Failed to load table data', err);
       })
       .finally(() => {
         setLoading(false);

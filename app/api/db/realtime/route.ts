@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBaasEngine } from '@/lib/db-server/server-state';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const baas = getBaasEngine();

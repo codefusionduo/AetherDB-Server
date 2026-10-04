@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerMetrics, getAuditLogs, getDatabaseUsers, addDatabaseUser, logQuery, getEngine } from '@/lib/db-server/server-state';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const metrics = getServerMetrics();
