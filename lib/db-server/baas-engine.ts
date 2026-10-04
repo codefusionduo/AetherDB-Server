@@ -281,7 +281,7 @@ export class BaasEngine {
     resendApiKey: process.env.RESEND_API_KEY || '',
     smtpHost: 'smtp.gmail.com',
     smtpPort: 587,
-    senderEmail: 'auth@aetherdb.ryzn.pro',
+    senderEmail: process.env.RESEND_FROM || 'AetherDB <auth@aetherdb.ryzn.pro>',
     senderName: 'AetherDB Auth Dispatcher',
     useSsl: true,
     htmlTemplate: `<div style="font-family: sans-serif; padding: 24px; background: #09090b; color: #f4f4f5; border-radius: 12px; max-width: 500px;">

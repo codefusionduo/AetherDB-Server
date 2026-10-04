@@ -47,9 +47,11 @@ export async function POST(req: NextRequest) {
           .replace(/{{otp_code}}/g, code)
           .replace(/{{user_email}}/g, email);
 
-        const primaryFrom = config.senderEmail && config.senderEmail !== 'onboarding@resend.dev'
-          ? config.senderEmail
-          : 'AetherDB Auth <auth@aetherdb.ryzn.pro>';
+        const configuredFrom = (process.env.RESEND_FROM || config.senderEmail || 'onboarding@resend.dev').trim();
+        const senderName = config.senderName || 'AetherDB';
+        const primaryFrom = configuredFrom.includes('<') && configuredFrom.includes('>')
+          ? configuredFrom
+          : `${senderName} <${configuredFrom}>`;
 
         try {
           let resendRes = await fetch('https://api.resend.com/emails', {
@@ -69,8 +71,8 @@ export async function POST(req: NextRequest) {
           let resendData = await resendRes.json();
 
           // Fallback to onboarding@resend.dev if custom domain is not yet verified in Resend
-          if (!resendRes.ok && (resendData?.message?.includes('domain') || resendData?.message?.includes('verify') || resendRes.status === 403 || resendRes.status === 422)) {
-            console.log('Custom domain not verified yet in Resend, falling back to onboarding@resend.dev');
+          if (!resendRes.ok && primaryFrom !== 'AetherDB <onboarding@resend.dev>' && primaryFrom !== 'onboarding@resend.dev') {
+            console.log('First Resend attempt failed:', resendData?.message, 'Retrying with onboarding@resend.dev');
             resendRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                from: 'AetherDB Auth <onboarding@resend.dev>',
+                from: 'AetherDB <onboarding@resend.dev>',
                 to: [email],
                 subject: '🔒 Activate Your AetherDB Account - Magic Login Link',
                 html: htmlBody

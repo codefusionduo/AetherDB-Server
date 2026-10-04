@@ -315,9 +315,22 @@ export function EmailStudio() {
                           </span>
                         </td>
                         <td className="px-3 py-2.5">
-                          <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-sans font-semibold">
-                            {mail.status}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-[10px] font-sans font-semibold border ${
+                              mail.status === 'DELIVERED'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : mail.status === 'FAILED'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}>
+                              {mail.status}
+                            </span>
+                            {mail.dispatchError && (
+                              <span className="text-[10px] text-rose-400/90 font-mono truncate max-w-[180px]" title={mail.dispatchError}>
+                                {mail.dispatchError}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2.5 text-zinc-400 font-sans text-[11px]">
                           {mail.latencyMs}ms
@@ -438,14 +451,43 @@ export function EmailStudio() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-zinc-300 font-medium">Sender Email Address</label>
+              <div className="flex items-center justify-between">
+                <label className="text-zinc-300 font-medium">Sender Email Address (RESEND_FROM)</label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSenderEmail('auth@aetherdb.ryzn.pro')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono transition-colors"
+                  >
+                    auth@aetherdb.ryzn.pro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSenderEmail('noreply@aetherdb.ryzn.pro')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono transition-colors"
+                  >
+                    noreply@aetherdb.ryzn.pro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSenderEmail('onboarding@resend.dev')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono transition-colors"
+                  >
+                    onboarding@resend.dev
+                  </button>
+                </div>
+              </div>
               <input
                 type="email"
                 required
                 value={senderEmail}
                 onChange={(e) => setSenderEmail(e.target.value)}
+                placeholder="auth@aetherdb.ryzn.pro"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-2 text-zinc-200 font-mono focus:outline-none focus:border-emerald-500"
               />
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                🚀 <strong className="text-emerald-400">Verified Domain:</strong> <code className="text-zinc-200">aetherdb.ryzn.pro</code> ke liye verified sender <code className="text-emerald-400">AetherDB &lt;auth@aetherdb.ryzn.pro&gt;</code> configured hai.
+              </p>
             </div>
 
             <div className="space-y-1">

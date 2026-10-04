@@ -301,13 +301,23 @@ export function LoginGate({ onSuccessLogin }: LoginGateProps) {
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs text-emerald-300">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>Dispatched via <strong>Resend API</strong> to Gmail</span>
+                  <span>Dispatched live via <strong>Resend API</strong></span>
                 </div>
                 {resendDeliveryInfo.resendId && (
                   <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
                     ID: {resendDeliveryInfo.resendId.slice(0, 12)}...
                   </span>
                 )}
+              </div>
+            ) : resendDeliveryInfo?.status === 'FAILED' ? (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Resend Delivery Notice</span>
+                </div>
+                <p className="text-[11px] text-amber-200/90 leading-relaxed font-mono">
+                  {resendDeliveryInfo.error || 'Resend error. Check sender email in Email Studio.'}
+                </p>
               </div>
             ) : (
               <p className="text-xs text-zinc-300 leading-relaxed">
