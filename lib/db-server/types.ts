@@ -98,6 +98,50 @@ export interface DatabaseUser {
 }
 
 // -------------------------------------------------------------
+// Aether Internal Platform & Admin Panel Types
+// -------------------------------------------------------------
+export const SUPER_ADMIN_EMAILS: readonly string[] = [
+  'yabhi9435@gmail.com',
+  'codefusionduo@gmail.com'
+];
+
+export function isSuperAdmin(email?: string | null): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.some(
+    (adminEmail) => adminEmail.toLowerCase() === email.trim().toLowerCase()
+  );
+}
+
+export interface AetherPlatformUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'DEVELOPER' | 'MEMBER';
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+  plan: 'FREE' | 'PRO' | 'ENTERPRISE';
+  apiKey: string;
+  storageUsedMb: number;
+  storageQuotaMb: number;
+  queryCount: number;
+  createdAt: string;
+  lastLoginAt: string;
+  twoFactorEnabled?: boolean;
+  projectsCount?: number;
+}
+
+export interface AetherAdminOverview {
+  totalUsers: number;
+  activeUsersToday: number;
+  totalDatabases: number;
+  totalTables: number;
+  totalRowsStored: number;
+  totalQueriesProcessed: number;
+  storageUsedMb: number;
+  systemHealth: 'OPTIMAL' | 'DEGRADED' | 'MAINTENANCE';
+  maintenanceMode: boolean;
+}
+
+// -------------------------------------------------------------
 // AetherDoc NoSQL Document Store Types
 // -------------------------------------------------------------
 export interface MongoDocument {

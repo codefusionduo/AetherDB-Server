@@ -204,7 +204,7 @@ export function getServerMetrics(): ServerMetrics {
   return {
     serverName: 'AetherDB Server Engine v2.4 (Enterprise)',
     version: '2.4.12-rel',
-    status: 'ONLINE',
+    status: global._maintenanceMode ? 'MAINTENANCE' : 'ONLINE',
     port: 5432,
     httpPort: 3000,
     uptimeSeconds,
@@ -218,5 +218,257 @@ export function getServerMetrics(): ServerMetrics {
     bufferPoolTotalMb: 256.0,
     diskUsageMb,
     slowQueriesCount: 3
+  };
+}
+
+// -------------------------------------------------------------
+// Aether Internal Database & Master Admin Functions
+// -------------------------------------------------------------
+declare global {
+  var _maintenanceMode: boolean | undefined;
+}
+
+export function isMaintenanceMode(): boolean {
+  return !!global._maintenanceMode;
+}
+
+export function setMaintenanceMode(enabled: boolean): boolean {
+  global._maintenanceMode = enabled;
+  logQuery({
+    timestamp: new Date().toLocaleTimeString(),
+    database: 'aetherdb',
+    sql: `ADMIN SET MAINTENANCE_MODE = ${enabled ? 'ON' : 'OFF'}`,
+    executionTimeMs: 0.2,
+    rowsAffected: 1,
+    status: 'SUCCESS',
+    clientIp: 'admin:internal'
+  });
+  return global._maintenanceMode;
+}
+
+export function getAetherPlatformUsers() {
+  const engine = getEngine();
+  const aetherDb = engine.getDatabase('aetherdb');
+  const userTable = aetherDb?.tables?.['users'];
+  
+  if (!userTable || !userTable.rows) {
+    return [];
+  }
+
+  // Ensure default super admins and authentic platform users exist in table
+  const superAdmins = [
+    {
+      id: 1,
+      name: "Abhishek (Super Administrator)",
+      email: "yabhi9435@gmail.com",
+      role: "SUPER_ADMIN",
+      status: "ACTIVE",
+      plan: "ENTERPRISE",
+      api_key: "aeth_live_super_yabhi9435_key",
+      storage_quota_mb: 10240,
+      storage_used_mb: 128.4,
+      queries_count: 1842,
+      last_login_at: "Active now",
+      created_at: "2026-10-03 12:00:00"
+    },
+    {
+      id: 5,
+      name: "CodeFusion Duo (Super Administrator)",
+      email: "codefusionduo@gmail.com",
+      role: "SUPER_ADMIN",
+      status: "ACTIVE",
+      plan: "ENTERPRISE",
+      api_key: "aeth_live_super_codefusionduo_key",
+      storage_quota_mb: 10240,
+      storage_used_mb: 145.8,
+      queries_count: 2450,
+      last_login_at: "Active now",
+      created_at: "2026-10-03 12:00:00"
+    }
+  ];
+
+  for (const sa of superAdmins) {
+    const exists = userTable.rows.some((r: any) => r.email?.toLowerCase() === sa.email.toLowerCase());
+    if (!exists) {
+      userTable.rows.push(sa);
+    }
+  }
+
+  return userTable.rows.map((r: any) => ({
+    id: `usr_${r.id}`,
+    numericId: r.id,
+    name: r.name || 'Unnamed User',
+    email: r.email,
+    role: (r.role || 'MEMBER').toUpperCase(),
+    status: (r.status || 'ACTIVE').toUpperCase(),
+    plan: (r.plan || 'PRO').toUpperCase(),
+    apiKey: r.api_key || `aeth_live_${r.id}_${Math.random().toString(36).substring(2, 8)}`,
+    storageUsedMb: r.storage_used_mb || 45.2,
+    storageQuotaMb: r.storage_quota_mb || 5120,
+    queryCount: r.queries_count || 120,
+    createdAt: r.created_at || new Date().toISOString(),
+    lastLoginAt: r.last_login_at || 'Recently active',
+    twoFactorEnabled: r.two_factor_enabled ?? true
+  }));
+}
+
+export function createAetherPlatformUser(data: {
+  name: string;
+  email: string;
+  role?: string;
+  plan?: string;
+  storageQuotaMb?: number;
+}) {
+  const engine = getEngine();
+  const aetherDb = engine.getDatabase('aetherdb');
+  if (!aetherDb || !aetherDb.tables?.['users']) {
+    throw new Error('aetherdb.users table not found');
+  }
+
+  const userTable = aetherDb.tables['users'];
+  // Check if email already exists
+  const existing = userTable.rows.find((u: any) => u.email?.toLowerCase() === data.email.toLowerCase());
+  if (existing) {
+    throw new Error(`User with email "${data.email}" already exists`);
+  }
+
+  const nextId = (userTable.autoIncrementCurrent || userTable.rows.length + 1);
+  userTable.autoIncrementCurrent = nextId + 1;
+
+  const newUserRow = {
+    id: nextId,
+    name: data.name.trim(),
+    email: data.email.trim().toLowerCase(),
+    role: (data.role || 'MEMBER').toUpperCase(),
+    status: 'ACTIVE',
+    plan: (data.plan || 'PRO').toUpperCase(),
+    api_key: `aeth_live_${nextId}_${Math.random().toString(36).substring(2, 10)}`,
+    storage_used_mb: 0,
+    storage_quota_mb: data.storageQuotaMb || (data.plan === 'ENTERPRISE' ? 10240 : 5120),
+    queries_count: 0,
+    last_login_at: 'Just registered',
+    created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    two_factor_enabled: false
+  };
+
+  userTable.rows.push(newUserRow);
+  persistState();
+
+  // Also add to BaaS Auth for cross-engine sync
+  try {
+    getBaasEngine().createAuthUser(newUserRow.email, newUserRow.role.toLowerCase(), 'email');
+  } catch {}
+
+  logQuery({
+    timestamp: new Date().toLocaleTimeString(),
+    database: 'aetherdb',
+    sql: `INSERT INTO users (name, email, role, plan) VALUES ('${newUserRow.name}', '${newUserRow.email}', '${newUserRow.role}', '${newUserRow.plan}')`,
+    executionTimeMs: 0.8,
+    rowsAffected: 1,
+    status: 'SUCCESS',
+    clientIp: 'admin:portal'
+  });
+
+  return {
+    ...newUserRow,
+    id: `usr_${newUserRow.id}`,
+    numericId: newUserRow.id
+  };
+}
+
+export function updateAetherPlatformUser(userId: string | number, updates: Partial<{
+  name: string;
+  role: string;
+  status: string;
+  plan: string;
+  storageQuotaMb: number;
+}>) {
+  const engine = getEngine();
+  const aetherDb = engine.getDatabase('aetherdb');
+  const userTable = aetherDb?.tables?.['users'];
+  if (!userTable) throw new Error('aetherdb.users table not found');
+
+  const numericId = typeof userId === 'string' ? parseInt(userId.replace('usr_', ''), 10) : userId;
+  const userRow = userTable.rows.find((u: any) => u.id === numericId);
+  if (!userRow) throw new Error(`User with ID ${userId} not found`);
+
+  if (updates.name !== undefined) userRow.name = updates.name.trim();
+  if (updates.role !== undefined) userRow.role = updates.role.toUpperCase();
+  if (updates.status !== undefined) userRow.status = updates.status.toUpperCase();
+  if (updates.plan !== undefined) userRow.plan = updates.plan.toUpperCase();
+  if (updates.storageQuotaMb !== undefined) userRow.storage_quota_mb = updates.storageQuotaMb;
+
+  persistState();
+
+  logQuery({
+    timestamp: new Date().toLocaleTimeString(),
+    database: 'aetherdb',
+    sql: `UPDATE users SET role='${userRow.role}', status='${userRow.status}', plan='${userRow.plan}' WHERE id=${numericId}`,
+    executionTimeMs: 0.6,
+    rowsAffected: 1,
+    status: 'SUCCESS',
+    clientIp: 'admin:portal'
+  });
+
+  return userRow;
+}
+
+export function deleteAetherPlatformUser(userId: string | number) {
+  const engine = getEngine();
+  const aetherDb = engine.getDatabase('aetherdb');
+  const userTable = aetherDb?.tables?.['users'];
+  if (!userTable) throw new Error('aetherdb.users table not found');
+
+  const numericId = typeof userId === 'string' ? parseInt(userId.replace('usr_', ''), 10) : userId;
+  const index = userTable.rows.findIndex((u: any) => u.id === numericId);
+  if (index === -1) throw new Error(`User with ID ${userId} not found`);
+
+  const deletedUser = userTable.rows.splice(index, 1)[0];
+  persistState();
+
+  logQuery({
+    timestamp: new Date().toLocaleTimeString(),
+    database: 'aetherdb',
+    sql: `DELETE FROM users WHERE id=${numericId}`,
+    executionTimeMs: 0.7,
+    rowsAffected: 1,
+    status: 'SUCCESS',
+    clientIp: 'admin:portal'
+  });
+
+  return deletedUser;
+}
+
+export function getAetherAdminOverview() {
+  const engine = getEngine();
+  const allDbs = engine.getAllDatabases();
+  const users = getAetherPlatformUsers();
+  
+  let totalTables = 0;
+  let totalRows = 0;
+  let totalBytes = 0;
+
+  for (const dbName in allDbs) {
+    totalBytes += allDbs[dbName].sizeBytes;
+    for (const tName in allDbs[dbName].tables) {
+      totalTables++;
+      const rowCount = allDbs[dbName].tables[tName].rows.length;
+      totalRows += rowCount;
+      totalBytes += rowCount * 1024 * 1.5;
+    }
+  }
+
+  const diskUsageMb = parseFloat((totalBytes / (1024 * 1024)).toFixed(2));
+
+  return {
+    totalUsers: users.length,
+    activeUsersToday: users.filter((u) => u.status === 'ACTIVE').length,
+    totalDatabases: Object.keys(allDbs).length,
+    totalTables,
+    totalRowsStored: totalRows,
+    totalQueriesProcessed: global._totalQueriesCount || 0,
+    storageUsedMb: diskUsageMb,
+    systemHealth: global._maintenanceMode ? 'MAINTENANCE' : 'OPTIMAL',
+    maintenanceMode: !!global._maintenanceMode
   };
 }

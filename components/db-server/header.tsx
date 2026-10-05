@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Database, Server, Copy, Check, Terminal, Download, RefreshCw, Zap, Trash2, LogOut, UserCheck } from 'lucide-react';
-import { ServerMetrics } from '@/lib/db-server/types';
+import { Database, Server, Copy, Check, Terminal, Download, RefreshCw, Zap, Trash2, LogOut, UserCheck, ShieldAlert } from 'lucide-react';
+import { ServerMetrics, isSuperAdmin } from '@/lib/db-server/types';
 import { ThreeLogo } from '@/components/ui/three-logo';
 
 interface HeaderProps {
@@ -18,6 +18,8 @@ interface HeaderProps {
   isBenchmarking: boolean;
   userEmail?: string;
   onLogout?: () => void;
+  onOpenAdminPanel?: () => void;
+  onSwitchUser?: (email: string) => void;
 }
 
 export function Header({
@@ -32,7 +34,9 @@ export function Header({
   onClearData,
   isBenchmarking,
   userEmail,
-  onLogout
+  onLogout,
+  onOpenAdminPanel,
+  onSwitchUser
 }: HeaderProps) {
   const [copied, setCopied] = useState(false);
 
@@ -130,6 +134,18 @@ export function Header({
           <span>{isBenchmarking ? 'Stressing...' : 'Benchmark'}</span>
         </button>
 
+        {/* Master Admin Console Shortcut (Restricted to Super Admins) */}
+        {onOpenAdminPanel && isSuperAdmin(userEmail) && (
+          <button
+            onClick={onOpenAdminPanel}
+            title="Open Master Super Admin Panel"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 text-amber-300 border border-amber-500/40 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all shadow-sm shadow-amber-950"
+          >
+            <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Admin Panel</span>
+          </button>
+        )}
+
         {/* SQL Dump */}
         <button
           onClick={onExportDump}
@@ -159,13 +175,47 @@ export function Header({
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
 
-        {/* Logged in user info & Logout */}
+        {/* Logged in user info & Super Admin Badge */}
         {userEmail && (
           <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[11px] font-mono text-emerald-300">
-              <UserCheck className="h-3 w-3 text-emerald-400" />
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono border ${
+              isSuperAdmin(userEmail)
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+            }`}>
+              {isSuperAdmin(userEmail) ? (
+                <ShieldAlert className="h-3 w-3 text-amber-400 shrink-0" />
+              ) : (
+                <UserCheck className="h-3 w-3 text-zinc-400 shrink-0" />
+              )}
               <span className="truncate max-w-[140px]">{userEmail}</span>
+              {isSuperAdmin(userEmail) && (
+                <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">
+                  SUPER
+                </span>
+              )}
             </div>
+
+            {/* Quick Switcher for testing Super Admin restrictions */}
+            {onSwitchUser && (
+              <select
+                value={userEmail}
+                onChange={(e) => onSwitchUser(e.target.value)}
+                title="Switch active user to test Super Admin permission restrictions"
+                className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-md px-1.5 py-1 text-[11px] text-zinc-300 focus:outline-none cursor-pointer"
+              >
+                <optgroup label="👑 Super Admins (Admin Access)">
+                  <option value="yabhi9435@gmail.com">yabhi9435@gmail.com (Super Admin)</option>
+                  <option value="codefusionduo@gmail.com">codefusionduo@gmail.com (Super Admin)</option>
+                </optgroup>
+                <optgroup label="👤 Regular Users (No Admin Access)">
+                  <option value="devin@aetherdb.ryzn.pro">devin@aetherdb.ryzn.pro (Developer)</option>
+                  <option value="priya.sharma@techcorp.in">priya.sharma@techcorp.in (Admin)</option>
+                  <option value="rahul.verma@startup.dev">rahul.verma@startup.dev (Member)</option>
+                </optgroup>
+              </select>
+            )}
+
             {onLogout && (
               <button
                 onClick={onLogout}

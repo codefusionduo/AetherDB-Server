@@ -16,11 +16,14 @@ import {
   ShieldCheck,
   FolderArchive,
   Radio,
-  Mail
+  Mail,
+  ShieldAlert
 } from 'lucide-react';
 import { ThreeLogo } from '@/components/ui/three-logo';
+import { isSuperAdmin } from '@/lib/db-server/types';
 
 export type ActiveTab =
+  | 'admin'
   | 'console'
   | 'studio'
   | 'schema'
@@ -43,6 +46,7 @@ interface SidebarProps {
   onSelectTable: (tableName: string) => void;
   onOpenCreateTable: () => void;
   currentDb: string;
+  currentUserEmail?: string;
 }
 
 export function Sidebar({
@@ -52,8 +56,11 @@ export function Sidebar({
   selectedTable,
   onSelectTable,
   onOpenCreateTable,
-  currentDb
+  currentDb,
+  currentUserEmail
 }: SidebarProps) {
+  const canAccessAdmin = isSuperAdmin(currentUserEmail);
+
   const sqlNav = [
     { id: 'console' as ActiveTab, label: 'SQL Console', icon: Terminal, color: 'text-emerald-400' },
     { id: 'studio' as ActiveTab, label: 'Table Data Studio', icon: TableProperties, color: 'text-emerald-400' },
@@ -79,6 +86,27 @@ export function Sidebar({
     <aside className="w-64 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0 select-none text-zinc-300">
       {/* Primary Navigation */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        {/* Section 0: Super Admin Console (Restricted to codefusionduo@gmail.com and yabhi9435@gmail.com) */}
+        {canAccessAdmin && (
+          <div>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-bold transition-all text-left border ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-amber-500/25 to-amber-600/10 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-950'
+                  : 'bg-zinc-900/90 hover:bg-zinc-850 text-zinc-200 border-zinc-800 hover:border-amber-500/30'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="tracking-tight">👑 Aether Admin Panel</span>
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                SUPER
+              </span>
+            </button>
+          </div>
+        )}
         {/* Section 1: SQL & Relational */}
         <div>
           <div className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 px-2">

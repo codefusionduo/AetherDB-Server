@@ -15,10 +15,11 @@ import { AuthStudio } from '@/components/db-server/auth-studio';
 import { StorageStudio } from '@/components/db-server/storage-studio';
 import { RealtimeStudio } from '@/components/db-server/realtime-studio';
 import { EmailStudio } from '@/components/db-server/email-studio';
+import { AdminPanel } from '@/components/db-server/admin-panel';
 import { CreateDbModal } from '@/components/db-server/create-db-modal';
 import { CreateTableModal } from '@/components/db-server/create-table-modal';
 import { LoginGate } from '@/components/auth/login-gate';
-import { ServerMetrics, QueryLogEntry, DatabaseUser, ColumnDefinition, QueryResult } from '@/lib/db-server/types';
+import { ServerMetrics, QueryLogEntry, DatabaseUser, ColumnDefinition, QueryResult, isSuperAdmin } from '@/lib/db-server/types';
 import { safeFetchJson } from '@/lib/utils';
 
 const DEFAULT_USER = {
@@ -74,6 +75,23 @@ export default function DatabaseServerApp() {
     setCurrentUser(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('aether_user_session');
+    }
+  };
+
+  const handleSwitchUser = (newEmail: string) => {
+    const userObj = {
+      email: newEmail,
+      token: `session_${newEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      id: `usr_${newEmail.replace(/[^a-zA-Z0-9]/g, '_')}`
+    };
+    setCurrentUser(userObj);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('aether_user_session', JSON.stringify(userObj));
+      } catch {}
+    }
+    if (!isSuperAdmin(newEmail) && activeTab === 'admin') {
+      setActiveTab('console');
     }
   };
 
@@ -384,6 +402,8 @@ export default function DatabaseServerApp() {
         isBenchmarking={isBenchmarking}
         userEmail={currentUser.email}
         onLogout={handleLogout}
+        onOpenAdminPanel={() => setActiveTab('admin')}
+        onSwitchUser={handleSwitchUser}
       />
 
       {/* Main Workspace */}
@@ -397,10 +417,26 @@ export default function DatabaseServerApp() {
           onSelectTable={(t) => setSelectedTable(t)}
           onOpenCreateTable={() => setShowCreateTableModal(true)}
           currentDb={currentDb}
+          currentUserEmail={currentUser.email}
         />
 
         {/* Primary View Area */}
         <main className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+          {activeTab === 'admin' && (
+            <AdminPanel
+              currentUserEmail={currentUser.email}
+              onRefreshAllData={() => {
+                loadDatabases();
+                loadTables(currentDb);
+                loadMetrics();
+              }}
+              onSwitchToTableStudio={(tableName) => {
+                setSelectedTable(tableName);
+                setActiveTab('studio');
+              }}
+            />
+          )}
+
           {activeTab === 'console' && (
             <SQLConsole
               key={currentDb}
