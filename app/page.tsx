@@ -382,6 +382,22 @@ export default function DatabaseServerApp() {
     loadMetrics();
   };
 
+  const handleDeleteDatabaseUser = async (userId: string) => {
+    const res = await fetch('/api/db/metrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'deleteUser',
+        userId
+      })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to delete user');
+    }
+    loadMetrics();
+  };
+
   if (!currentUser) {
     return <LoginGate onSuccessLogin={handleSuccessLogin} />;
   }
@@ -518,6 +534,7 @@ export default function DatabaseServerApp() {
             <UserAccess
               users={users}
               onAddUser={handleAddUser}
+              onDeleteUser={handleDeleteDatabaseUser}
               databases={databases}
             />
           )}

@@ -10,27 +10,42 @@ import {
   Check,
   CheckCircle2,
   Lock,
-  Database
+  Database,
+  Trash2
 } from 'lucide-react';
-import { DatabaseUser } from '@/lib/db-server/types';
+import { DatabaseUser, isSuperAdmin } from '@/lib/db-server/types';
 
 interface UserAccessProps {
   users: DatabaseUser[];
   onAddUser: (username: string, role: 'SUPERUSER' | 'READ_WRITE' | 'READ_ONLY', dbScope: string[]) => Promise<void>;
+  onDeleteUser?: (userId: string) => Promise<void>;
   databases: string[];
 }
 
-export function UserAccess({ users, onAddUser, databases }: UserAccessProps) {
+export function UserAccess({ users, onAddUser, onDeleteUser, databases }: UserAccessProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<'SUPERUSER' | 'READ_WRITE' | 'READ_ONLY'>('READ_WRITE');
   const [selectedDb, setSelectedDb] = useState<string>('*');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const copyKey = (key: string) => {
     navigator.clipboard.writeText(key);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleDelete = async (u: DatabaseUser) => {
+    if (!onDeleteUser) return;
+    if (confirm(`Are you sure you want to delete user account "${u.username}"?`)) {
+      setDeletingId(u.id);
+      try {
+        await onDeleteUser(u.id);
+      } finally {
+        setDeletingId(null);
+      }
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -114,52 +129,73 @@ export function UserAccess({ users, onAddUser, databases }: UserAccessProps) {
                 <th className="px-3 py-2.5">Database Scope</th>
                 <th className="px-3 py-2.5">API Secret Key</th>
                 <th className="px-3 py-2.5">Last Active</th>
+                <th className="px-3 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-850">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-zinc-850/50">
-                  <td className="px-3 py-2.5 font-bold text-zinc-200 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    <span>{u.username}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded font-sans font-medium border ${
-                        u.role === 'SUPERUSER'
-                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          : u.role === 'READ_WRITE'
-                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                          : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-zinc-300">
-                    {u.databaseAccess.join(', ')}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-400 font-mono text-[11px] truncate max-w-[160px]">
-                        {u.apiKey}
-                      </span>
-                      <button
-                        onClick={() => copyKey(u.apiKey)}
-                        className="p-1 text-zinc-400 hover:text-zinc-200"
-                        title="Copy API Key"
+              {users.map((u) => {
+                const isSuper = isSuperAdmin(u.username);
+                return (
+                  <tr key={u.id} className="hover:bg-zinc-850/50">
+                    <td className="px-3 py-2.5 font-bold text-zinc-200 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      <span>{u.username}</span>
+                      {isSuper && (
+                        <span className="text-[9px] font-sans px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+                          SUPER
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded font-sans font-medium border ${
+                          u.role === 'SUPERUSER'
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            : u.role === 'READ_WRITE'
+                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                            : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                        }`}
                       >
-                        {copiedKey === u.apiKey ? (
-                          <Check className="h-3 w-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-zinc-400 font-sans">{u.lastLogin || 'Active'}</td>
-                </tr>
-              ))}
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-zinc-300">
+                      {u.databaseAccess.join(', ')}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-zinc-400 font-mono text-[11px] truncate max-w-[160px]">
+                          {u.apiKey}
+                        </span>
+                        <button
+                          onClick={() => copyKey(u.apiKey)}
+                          className="p-1 text-zinc-400 hover:text-zinc-200"
+                          title="Copy API Key"
+                        >
+                          {copiedKey === u.apiKey ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-zinc-400 font-sans">{u.lastLogin || 'Active'}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      {onDeleteUser && (
+                        <button
+                          onClick={() => handleDelete(u)}
+                          disabled={deletingId === u.id}
+                          className="p-1 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                          title={`Delete account ${u.username}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

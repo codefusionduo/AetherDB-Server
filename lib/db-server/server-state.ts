@@ -93,17 +93,17 @@ if (!global._databaseUsersList) {
       username: 'yabhi9435@gmail.com',
       role: 'SUPERUSER',
       databaseAccess: ['*'],
-      createdAt: new Date().toISOString(),
+      createdAt: '2026-10-03 12:00:00',
       apiKey: 'aeth_sk_live_yabhi9435_admin_key',
       lastLogin: 'Active now'
     },
     {
-      id: 'usr_root',
-      username: 'admin',
+      id: 'usr_codefusion',
+      username: 'codefusionduo@gmail.com',
       role: 'SUPERUSER',
       databaseAccess: ['*'],
-      createdAt: new Date().toISOString(),
-      apiKey: 'aeth_sk_live_99f2e301b4c91a',
+      createdAt: '2026-10-03 12:00:00',
+      apiKey: 'aeth_sk_live_codefusionduo_admin_key',
       lastLogin: 'Active now'
     }
   ];
@@ -183,6 +183,16 @@ export function addDatabaseUser(user: Omit<DatabaseUser, 'id' | 'createdAt' | 'a
   };
   global._databaseUsersList?.push(newUser);
   return newUser;
+}
+
+export function deleteDatabaseUser(userId: string): boolean {
+  if (!global._databaseUsersList) return false;
+  const idx = global._databaseUsersList.findIndex((u) => u.id === userId || u.username === userId);
+  if (idx !== -1) {
+    global._databaseUsersList.splice(idx, 1);
+    return true;
+  }
+  return false;
 }
 
 export function getServerMetrics(): ServerMetrics {

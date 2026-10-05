@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerMetrics, getAuditLogs, getDatabaseUsers, addDatabaseUser, logQuery, getEngine } from '@/lib/db-server/server-state';
+import { getServerMetrics, getAuditLogs, getDatabaseUsers, addDatabaseUser, deleteDatabaseUser, logQuery, getEngine } from '@/lib/db-server/server-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +78,16 @@ export async function POST(req: NextRequest) {
         databaseAccess: databaseAccess || ['*']
       });
       return NextResponse.json({ success: true, user });
+    }
+
+    // Action 3: Delete database user
+    if (action === 'deleteUser') {
+      const { userId } = body;
+      if (!userId) {
+        return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+      }
+      const ok = deleteDatabaseUser(userId);
+      return NextResponse.json({ success: ok, message: ok ? 'User deleted' : 'User not found' });
     }
 
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });

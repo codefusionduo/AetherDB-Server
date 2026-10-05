@@ -208,11 +208,6 @@ export function Header({
                   <option value="yabhi9435@gmail.com">yabhi9435@gmail.com (Super Admin)</option>
                   <option value="codefusionduo@gmail.com">codefusionduo@gmail.com (Super Admin)</option>
                 </optgroup>
-                <optgroup label="👤 Regular Users (No Admin Access)">
-                  <option value="devin@aetherdb.ryzn.pro">devin@aetherdb.ryzn.pro (Developer)</option>
-                  <option value="priya.sharma@techcorp.in">priya.sharma@techcorp.in (Admin)</option>
-                  <option value="rahul.verma@startup.dev">rahul.verma@startup.dev (Member)</option>
-                </optgroup>
               </select>
             )}
 

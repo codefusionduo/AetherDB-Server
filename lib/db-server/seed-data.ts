@@ -27,17 +27,17 @@ export const INITIAL_DATABASES: Record<string, DatabaseData> = {
         rows: [
           {
             id: 1,
-            name: 'Abhishek (Administrator)',
+            name: 'Abhishek (Super Administrator)',
             email: 'yabhi9435@gmail.com',
-            role: 'admin',
+            role: 'SUPER_ADMIN',
             status: 'ACTIVE',
             created_at: '2026-10-03 12:00:00'
           },
           {
             id: 2,
-            name: 'AetherDB Service Bot',
-            email: 'auth@aetherdb.ryzn.pro',
-            role: 'service_role',
+            name: 'CodeFusion Duo (Super Administrator)',
+            email: 'codefusionduo@gmail.com',
+            role: 'SUPER_ADMIN',
             status: 'ACTIVE',
             created_at: '2026-10-03 12:00:00'
           }
