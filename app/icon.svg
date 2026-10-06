@@ -1,0 +1,53 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="16" fill="#09090b"/>
+  <rect x="1" y="1" width="62" height="62" rx="15" stroke="url(#borderGrad)" stroke-width="2"/>
+  
+  <!-- Glow background -->
+  <circle cx="32" cy="32" r="22" fill="url(#coreGlow)" opacity="0.6"/>
+  
+  <!-- Antenna -->
+  <line x1="32" y1="8" x2="32" y2="16" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="32" cy="7" r="3" fill="#38bdf8" filter="url(#glow)"/>
+  
+  <!-- Suku Robot Head -->
+  <rect x="10" y="16" width="44" height="36" rx="10" fill="url(#sukuHeadGrad)" stroke="#c084fc" stroke-width="2"/>
+  
+  <!-- Glowing Cyan Eyes -->
+  <circle cx="23" cy="32" r="4.5" fill="#38bdf8"/>
+  <circle cx="24" cy="31" r="1.5" fill="#ffffff"/>
+  
+  <circle cx="41" cy="32" r="4.5" fill="#38bdf8"/>
+  <circle cx="42" cy="31" r="1.5" fill="#ffffff"/>
+  
+  <!-- Suku Neural Smile Wave -->
+  <path d="M24 42C27 45.5 37 45.5 40 42" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Subtle Ears / Connectors -->
+  <rect x="6" y="28" width="4" height="12" rx="2" fill="#a855f7"/>
+  <rect x="54" y="28" width="4" height="12" rx="2" fill="#a855f7"/>
+
+  <defs>
+    <linearGradient id="borderGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="0.5" stop-color="#06b6d4"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="sukuHeadGrad" x1="10" y1="16" x2="54" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3b0764"/>
+      <stop offset="0.7" stop-color="#1e1b4b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0.5" cy="0.5" r="0.5" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 32) scale(44)">
+      <stop stop-color="#a855f7" stop-opacity="0.8"/>
+      <stop offset="0.6" stop-color="#06b6d4" stop-opacity="0.3"/>
+      <stop offset="1" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="25" y="0" width="14" height="14" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
