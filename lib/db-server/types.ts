@@ -33,6 +33,8 @@ export interface DatabaseData {
   sizeBytes: number;
   tables: Record<string, TableData>;
   createdAt: string;
+  owner?: string;
+  isSystem?: boolean;
 }
 
 export interface QueryResult {

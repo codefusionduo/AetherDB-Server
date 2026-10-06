@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Code2,
   Copy,
@@ -15,16 +15,52 @@ import {
   KeyRound,
   Table,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  Info,
+  SlidersHorizontal
 } from 'lucide-react';
+
+import { DatabaseUser, isSuperAdmin } from '@/lib/db-server/types';
 
 interface ApiHubProps {
   currentDb: string;
+  databases?: string[];
+  tables?: { name: string; rowCount: number }[];
+  onSelectDb?: (db: string) => void;
+  currentUserEmail?: string;
+  databaseOwners?: Record<string, string>;
 }
 
-export function ApiHub({ currentDb }: ApiHubProps) {
-  const [selectedLang, setSelectedLang] = useState<'suku_ai' | 'node' | 'curl' | 'python' | 'aether_sdk' | 'aether_doc' | 'aether_live'>('suku_ai');
+export function ApiHub({
+  currentDb,
+  databases = ['suku_chat_db', 'aetherdb', 'main_db'],
+  tables = [],
+  onSelectDb,
+  currentUserEmail = 'yabhi9435@gmail.com',
+  databaseOwners = {}
+}: ApiHubProps) {
+  const [selectedLang, setSelectedLang] = useState<'python' | 'node' | 'curl' | 'suku_ai' | 'aether_sdk' | 'aether_doc' | 'aether_live'>('suku_ai');
   const [copied, setCopied] = useState<string | null>(null);
+
+  const isSuper = isSuperAdmin(currentUserEmail);
+
+  // Filter databases: Super Admins see all, regular users only see their own created databases or public defaults
+  const userDatabases = isSuper
+    ? databases
+    : databases.filter(db => {
+        const owner = databaseOwners[db];
+        return !owner || owner === currentUserEmail || owner === 'system' || db === 'main_db';
+      });
+
+  // Selected table inside current database
+  const availableTables = tables && tables.length > 0 ? tables.map(t => t.name) : (currentDb === 'suku_chat_db' ? ['chat_history'] : ['users']);
+  const [selectedTable, setSelectedTable] = useState<string>(availableTables[0] || 'chat_history');
+
+  useEffect(() => {
+    if (availableTables.length > 0 && !availableTables.includes(selectedTable)) {
+      setSelectedTable(availableTables[0]);
+    }
+  }, [currentDb, availableTables, selectedTable]);
 
   // Suku test state
   const [sukuUserMsg, setSukuUserMsg] = useState('AetherDB se Suku AI connect ho gaya!');
@@ -34,13 +70,27 @@ export function ApiHub({ currentDb }: ApiHubProps) {
   const [sukuResponse, setSukuResponse] = useState<any>(null);
 
   // Interactive Tester state
-  const [testEndpoint, setTestEndpoint] = useState<string>('/api/v1/suku/chat');
+  const isSukuDb = currentDb === 'suku_chat_db';
+  const defaultEndpoint = isSukuDb ? '/api/v1/suku/chat' : '/api/v1/query';
+  const [testEndpoint, setTestEndpoint] = useState<string>(defaultEndpoint);
   const [testMethod, setTestMethod] = useState<'POST' | 'GET'>('POST');
   const [testPayload, setTestPayload] = useState<string>(
-    JSON.stringify({ user_msg: 'Hello Suku!', ai_msg: 'Hello! I am connected to AetherDB.', session_id: 'suku_session_default' }, null, 2)
+    isSukuDb
+      ? JSON.stringify({ user_msg: 'Hello Suku!', ai_msg: 'Hello! I am connected to AetherDB.', session_id: 'suku_session_default' }, null, 2)
+      : JSON.stringify({ database: currentDb, sql: `SELECT * FROM ${selectedTable} LIMIT 10;` }, null, 2)
   );
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    const ep = currentDb === 'suku_chat_db' ? '/api/v1/suku/chat' : '/api/v1/query';
+    setTestEndpoint(ep);
+    if (currentDb === 'suku_chat_db') {
+      setTestPayload(JSON.stringify({ user_msg: 'Hello Suku!', ai_msg: 'Hello! I am connected to AetherDB.', session_id: 'suku_session_default' }, null, 2));
+    } else {
+      setTestPayload(JSON.stringify({ database: currentDb, sql: `SELECT * FROM ${selectedTable} LIMIT 10;` }, null, 2));
+    }
+  }, [currentDb, selectedTable]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -48,11 +98,10 @@ export function ApiHub({ currentDb }: ApiHubProps) {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const SUKU_API_ENDPOINT = typeof window !== 'undefined' ? `${window.location.origin}/api/v1/suku/chat` : 'https://aetherdb.ryzn.pro/api/v1/suku/chat';
-  const SUKU_SQL_ENDPOINT = typeof window !== 'undefined' ? `${window.location.origin}/api/v1/query` : 'https://aetherdb.ryzn.pro/api/v1/query';
-  const SUKU_API_KEY = 'aeth_sk_suku_live_9f83ac42e1';
-  const SUKU_DB_NAME = 'suku_chat_db';
-  const SUKU_TABLE_NAME = 'chat_history';
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aetherdb.ryzn.pro';
+  const API_ENDPOINT = isSukuDb ? `${originUrl}/api/v1/suku/chat` : `${originUrl}/api/v1/query`;
+  const SQL_ENDPOINT = `${originUrl}/api/v1/query`;
+  const API_KEY = 'aeth_sk_suku_live_9f83ac42e1';
 
   const handleSendSukuTest = async () => {
     setSukuTesting(true);
@@ -62,7 +111,7 @@ export function ApiHub({ currentDb }: ApiHubProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUKU_API_KEY}`
+          'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
           session_id: sukuSessionId,
@@ -80,21 +129,25 @@ export function ApiHub({ currentDb }: ApiHubProps) {
   };
 
   const codeSnippets: Record<string, string> = {
-    suku_ai: `# 🤖 Suku AI Backend Integration (Python)
+    suku_ai: `# 🤖 Suku AI Integration for Database: "${currentDb}"
 import requests
 
-AETHER_ENDPOINT = "${SUKU_API_ENDPOINT}"
-API_KEY = "${SUKU_API_KEY}"
+AETHER_ENDPOINT = "${API_ENDPOINT}"
+API_KEY = "${API_KEY}"
+DATABASE_NAME = "${currentDb}"
+TABLE_NAME = "${selectedTable}"
 
 def save_chat_to_aetherdb(user_msg: str, ai_msg: str, session_id: str = "default_session"):
     """
-    Saves user and AI response directly into AetherDB suku_chat_db.chat_history table.
+    Saves message directly into AetherDB (${currentDb}.${selectedTable})
     """
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {API_KEY}"
     }
     payload = {
+        "database": DATABASE_NAME,
+        "table": TABLE_NAME,
         "session_id": session_id,
         "user_msg": user_msg,
         "ai_msg": ai_msg
@@ -102,19 +155,41 @@ def save_chat_to_aetherdb(user_msg: str, ai_msg: str, session_id: str = "default
     response = requests.post(AETHER_ENDPOINT, json=payload, headers=headers)
     return response.json()
 
-# Example: Save message after Suku AI responds
-res = save_chat_to_aetherdb(
+# Example: Save Suku AI response
+result = save_chat_to_aetherdb(
     user_msg="${sukuUserMsg}",
     ai_msg="${sukuAiMsg}",
     session_id="${sukuSessionId}"
 )
-print("Saved to AetherDB:", res)`,
+print("Saved to ${currentDb}:", result)`,
 
-    node: `// 🤖 Suku AI Integration in Node.js / TypeScript
-const AETHER_ENDPOINT = '${SUKU_API_ENDPOINT}';
-const API_KEY = '${SUKU_API_KEY}';
+    python: `# 🐍 Python Generic SQL Query Client for Database: "${currentDb}"
+import requests
 
-async function saveSukuChat(userMsg, aiMsg, sessionId = 'default_session') {
+AETHER_URL = "${SQL_ENDPOINT}"
+API_KEY = "${API_KEY}"
+
+def run_query(sql_query: str):
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    payload = {
+        "database": "${currentDb}",
+        "sql": sql_query
+    }
+    response = requests.post(AETHER_URL, json=payload, headers=headers)
+    return response.json()
+
+# Query '${selectedTable}' in '${currentDb}'
+data = run_query("SELECT * FROM ${selectedTable} LIMIT 10")
+print("Rows returned:", data.get("rows", []))`,
+
+    node: `// ⚡ Node.js / TypeScript Client for Database: "${currentDb}"
+const AETHER_ENDPOINT = '${API_ENDPOINT}';
+const API_KEY = '${API_KEY}';
+
+async function executeDatabaseRequest() {
   const response = await fetch(AETHER_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -122,85 +197,68 @@ async function saveSukuChat(userMsg, aiMsg, sessionId = 'default_session') {
       'Authorization': \`Bearer \${API_KEY}\`
     },
     body: JSON.stringify({
-      session_id: sessionId,
-      user_msg: userMsg,
-      ai_msg: aiMsg
+      database: '${currentDb}',
+      table: '${selectedTable}',
+      sql: 'SELECT * FROM ${selectedTable} LIMIT 10'
     })
   });
-  return await response.json();
+  const data = await response.json();
+  console.log('Result from ${currentDb}:', data);
 }
 
-// Example usage:
-saveSukuChat('Namaste Suku!', 'Namaste! Kaise madad kar sakta hu?', 'session_101')
-  .then(console.log);`,
+executeDatabaseRequest();`,
 
-    curl: `# 🤖 Suku AI Direct cURL Test
-curl -X POST "${SUKU_API_ENDPOINT}" \\
+    curl: `# 🌐 cURL Request for Database: "${currentDb}"
+curl -X POST "${API_ENDPOINT}" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${SUKU_API_KEY}" \\
+  -H "Authorization: Bearer ${API_KEY}" \\
   -d '{
-    "session_id": "${sukuSessionId}",
-    "user_msg": "${sukuUserMsg}",
-    "ai_msg": "${sukuAiMsg}"
+    "database": "${currentDb}",
+    "table": "${selectedTable}",
+    "sql": "SELECT * FROM ${selectedTable} LIMIT 10;"
   }'`,
 
-    python: `# Python Raw SQL Query Client
-import requests
+    aether_sdk: `// 🚀 Aether SDK Client for Database: "${currentDb}"
+import { createClient } from '@aetherdb/client';
 
-res = requests.post(
-    "${SUKU_SQL_ENDPOINT}",
-    headers={"Authorization": "Bearer ${SUKU_API_KEY}"},
-    json={"database": "suku_chat_db", "sql": "SELECT * FROM chat_history ORDER BY id DESC LIMIT 10"}
-)
-print("Chat History:", res.json())`,
+const aether = createClient('${originUrl}/api/db', '${API_KEY}');
 
-    aether_sdk: `// Connect to AetherDB using standard REST client
-const res = await fetch('${SUKU_API_ENDPOINT}', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ${SUKU_API_KEY}'
-  },
-  body: JSON.stringify({
-    session_id: 'session_001',
-    user_msg: 'Hello Suku!',
-    ai_msg: 'Hello! How can I help?'
-  })
-});
-const result = await res.json();
-console.log(result);`,
+// Query '${selectedTable}' from database '${currentDb}'
+const { data, error } = await aether
+  .from('${selectedTable}')
+  .select('*')
+  .limit(10);
 
-    aether_doc: `// Connect to AetherDoc NoSQL Document Store
+console.log('Data:', data);`,
+
+    aether_doc: `// 📄 AetherDoc NoSQL Collection for Database: "${currentDb}"
 import { AetherDocClient } from '@aetherdb/doc';
 
-const client = new AetherDocClient('https://aetherdb.ryzn.pro');
+const client = new AetherDocClient('${originUrl}');
 
 async function run() {
   await client.connect();
-  const db = client.db('suku_chat_db');
-  const collection = db.collection('chat_logs');
+  const db = client.db('${currentDb}');
+  const collection = db.collection('${selectedTable}');
 
-  await collection.insertOne({
-    session_id: 'suku_session_001',
-    user_msg: 'Hello Suku!',
-    ai_msg: 'Hello! Stored as JSON document in AetherDB.',
-    timestamp: new Date().toISOString()
-  });
+  // Insert or Query JSON document in '${currentDb}'
+  const results = await collection.find({}).limit(10).toArray();
+  console.log('Documents in ${currentDb}.${selectedTable}:', results);
 }
 run();`,
 
-    aether_live: `// Connect to AetherLive Stream (Realtime Chat Events)
+    aether_live: `// 📡 AetherLive Realtime Channel for Database: "${currentDb}"
 import { AetherClient } from '@aetherdb/client';
 
 const aether = new AetherClient({
-  apiKey: '${SUKU_API_KEY}',
-  endpoint: 'https://aetherdb.ryzn.pro'
+  apiKey: '${API_KEY}',
+  endpoint: '${originUrl}'
 });
 
-// Listen to incoming chat history inserts in real-time
-aether.channel('suku_chat_db:chat_history')
+// Listen to changes in ${currentDb}:${selectedTable} in real-time
+aether.channel('${currentDb}:${selectedTable}')
   .on('INSERT', (payload) => {
-    console.log('New Suku AI message saved:', payload.new);
+    console.log('Live insert in ${currentDb}.${selectedTable}:', payload.new);
   })
   .subscribe();`
   };
@@ -213,7 +271,7 @@ aether.channel('suku_chat_db:chat_history')
         method: testMethod,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUKU_API_KEY}`
+          'Authorization': `Bearer ${API_KEY}`
         }
       };
 
@@ -246,11 +304,11 @@ aether.channel('suku_chat_db:chat_history')
           <span>Client Connection & REST API Hub</span>
         </h2>
         <p className="text-xs text-zinc-400 mt-0.5">
-          Connect Suku AI, web applications, microservices, or CLI bots directly to AetherDB.
+          Connect Suku AI, Python backend, Node.js microservices, or CLI bots dynamically to any database.
         </p>
       </div>
 
-      {/* 🤖 FEATURED: Suku AI Integration Box */}
+      {/* 🤖 DYNAMIC INTEGRATION CONFIG BOX (Updates for EVERY Database) */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-950/40 via-zinc-900/80 to-zinc-900/90 border border-purple-500/30 shadow-xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-500/20 pb-3.5">
           <div className="flex items-center gap-2.5">
@@ -259,19 +317,67 @@ aether.channel('suku_chat_db:chat_history')
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white tracking-tight">Suku AI &lt;-&gt; AetherDB Connection Config</h3>
+                <h3 className="text-sm font-bold text-white tracking-tight">Database Connection Parameters & Credentials</h3>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
-                  READY TO CONNECT
+                  LIVE DYNAMIC CONFIG
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Ye 4 parameters use karke aap Suku AI ke code se messages ko directly AetherDB me save aur query kar sakte hain:
+                Ye 4 parameters har database ke liye dynamically update hote hain:
               </p>
             </div>
           </div>
+
+          {/* Database & Table Live Switcher Controls */}
+          <div className="flex flex-wrap items-center gap-2 bg-zinc-950/80 p-1.5 rounded-xl border border-zinc-800">
+            <div className="flex items-center gap-1.5 px-2 text-xs text-zinc-400">
+              <SlidersHorizontal className="h-3.5 w-3.5 text-purple-400" />
+              <span className="text-[11px] font-medium text-zinc-300">Your Databases:</span>
+            </div>
+            <select
+              value={currentDb}
+              onChange={(e) => onSelectDb && onSelectDb(e.target.value)}
+              className="bg-zinc-900 border border-purple-500/40 hover:border-purple-400 text-purple-200 font-mono text-xs rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
+            >
+              {userDatabases.map((db) => {
+                const owner = databaseOwners[db];
+                const isOwner = owner === currentUserEmail;
+                return (
+                  <option key={db} value={db}>
+                    📁 {db} {db === 'suku_chat_db' ? '(Suku AI)' : isOwner ? '(Created by You)' : isSuper && owner ? `(${owner})` : ''}
+                  </option>
+                );
+              })}
+            </select>
+
+            <span className="text-zinc-600">/</span>
+
+            <select
+              value={selectedTable}
+              onChange={(e) => setSelectedTable(e.target.value)}
+              className="bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 font-mono text-xs rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
+            >
+              {availableTables.map((t) => (
+                <option key={t} value={t}>
+                  📊 {t}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* The 4 Credentials Grid */}
+        {/* Dynamic Database Notice Info & Privacy Protection */}
+        <div className="px-3.5 py-2 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200/90 flex items-start gap-2.5">
+          <Info className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+          <div className="text-[11px] leading-relaxed">
+            <span className="font-semibold text-white">🔒 Private Creator Isolation: </span>
+            <span>
+              Ye database aur iska data sirf iske creator (<strong>{databaseOwners[currentDb] || (currentDb === 'suku_chat_db' ? 'Suku AI' : currentUserEmail)}</strong>) aur Super Admins ko hi dikhta hai. Kisi bhi unauthorized user ko doosre users ka database show nahi hoga.
+            </span>
+          </div>
+        </div>
+
+        {/* The 4 Credentials Grid (Dynamically updated for currentDb & selectedTable) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {/* 1. API Endpoint */}
           <div className="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 hover:border-purple-500/40 transition-colors">
@@ -281,7 +387,7 @@ aether.channel('suku_chat_db:chat_history')
                 1. API Endpoint / Connection URL
               </span>
               <button
-                onClick={() => copyToClipboard(SUKU_API_ENDPOINT, 'endpoint')}
+                onClick={() => copyToClipboard(API_ENDPOINT, 'endpoint')}
                 className="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1 bg-zinc-800 px-2 py-0.5 rounded transition-colors"
               >
                 {copied === 'endpoint' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
@@ -289,10 +395,10 @@ aether.channel('suku_chat_db:chat_history')
               </button>
             </div>
             <div className="p-2 rounded bg-zinc-950 border border-zinc-850 font-mono text-xs text-emerald-400 truncate">
-              {SUKU_API_ENDPOINT}
+              {API_ENDPOINT}
             </div>
             <p className="text-[11px] text-zinc-400">
-              Suku AI ka backend is URL par POST request bhejkar messages save karega.
+              {isSukuDb ? 'Suku AI Chat REST endpoint' : `Generic SQL / REST query endpoint for database "${currentDb}"`}
             </p>
           </div>
 
@@ -304,7 +410,7 @@ aether.channel('suku_chat_db:chat_history')
                 2. API Key / Access Token
               </span>
               <button
-                onClick={() => copyToClipboard(SUKU_API_KEY, 'key')}
+                onClick={() => copyToClipboard(API_KEY, 'key')}
                 className="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1 bg-zinc-800 px-2 py-0.5 rounded transition-colors"
               >
                 {copied === 'key' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
@@ -312,45 +418,46 @@ aether.channel('suku_chat_db:chat_history')
               </button>
             </div>
             <div className="p-2 rounded bg-zinc-950 border border-zinc-850 font-mono text-xs text-amber-300 truncate">
-              {SUKU_API_KEY}
+              {API_KEY}
             </div>
             <p className="text-[11px] text-zinc-400">
-              Header me <code className="text-zinc-300 font-mono">Authorization: Bearer {SUKU_API_KEY}</code> bhejein.
+              Header me <code className="text-zinc-300 font-mono">Authorization: Bearer {API_KEY}</code> bhejein.
             </p>
           </div>
 
-          {/* 3. Database Name */}
-          <div className="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 hover:border-purple-500/40 transition-colors">
+          {/* 3. Database Name (Project ID) */}
+          <div className="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 hover:border-cyan-500/40 transition-colors">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
                 <Database className="h-3.5 w-3.5 text-cyan-400" />
                 3. Database Name (Project ID)
               </span>
               <button
-                onClick={() => copyToClipboard(SUKU_DB_NAME, 'dbname')}
+                onClick={() => copyToClipboard(currentDb, 'dbname')}
                 className="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1 bg-zinc-800 px-2 py-0.5 rounded transition-colors"
               >
                 {copied === 'dbname' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                 <span>{copied === 'dbname' ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <div className="p-2 rounded bg-zinc-950 border border-zinc-850 font-mono text-xs text-cyan-300">
-              {SUKU_DB_NAME}
+            <div className="p-2 rounded bg-zinc-950 border border-zinc-850 font-mono text-xs text-cyan-300 flex items-center justify-between">
+              <span>{currentDb}</span>
+              <span className="text-[10px] text-cyan-400/80 font-sans">Active Target</span>
             </div>
             <p className="text-[11px] text-zinc-400">
-              AetherDB me Suku AI ke liye dedicated database banaya gaya hai.
+              Har database ka apna unique naam hota hai jise aap request me pass karte hain.
             </p>
           </div>
 
           {/* 4. Table Name */}
-          <div className="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 hover:border-purple-500/40 transition-colors">
+          <div className="p-3.5 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 hover:border-emerald-500/40 transition-colors">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-emerald-300 flex items-center gap-1.5">
                 <Table className="h-3.5 w-3.5 text-emerald-400" />
-                4. Table Name & Fields
+                4. Table / Collection Name
               </span>
               <button
-                onClick={() => copyToClipboard(SUKU_TABLE_NAME, 'table')}
+                onClick={() => copyToClipboard(selectedTable, 'table')}
                 className="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1 bg-zinc-800 px-2 py-0.5 rounded transition-colors"
               >
                 {copied === 'table' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
@@ -358,82 +465,94 @@ aether.channel('suku_chat_db:chat_history')
               </button>
             </div>
             <div className="p-2 rounded bg-zinc-950 border border-zinc-850 font-mono text-xs text-emerald-300 flex items-center justify-between">
-              <span>{SUKU_TABLE_NAME}</span>
-              <span className="text-[10px] text-zinc-400">(user_msg, ai_msg, timestamp)</span>
+              <span>{selectedTable}</span>
+              <span className="text-[10px] text-zinc-400 font-sans">({currentDb}.{selectedTable})</span>
             </div>
             <p className="text-[11px] text-zinc-400">
-              Table schema: <code className="text-zinc-300 font-mono">id, session_id, user_msg, ai_msg, timestamp</code>
+              {isSukuDb ? 'Fields: id, session_id, user_msg, ai_msg, timestamp' : `Selected table in database "${currentDb}"`}
             </p>
           </div>
         </div>
 
-        {/* Live Test Console for Suku AI */}
+        {/* Live Test Console */}
         <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
               <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              <span>Live Test: Send a Message from Suku AI to AetherDB</span>
+              <span>Live Test: Send a Message / Query to Database &quot;{currentDb}&quot;</span>
             </div>
-            <span className="text-[10px] text-zinc-500 font-mono">POST /api/v1/suku/chat</span>
+            <span className="text-[10px] text-zinc-500 font-mono">Target: {currentDb}.{selectedTable}</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          {isSukuDb ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div>
+                <label className="text-[11px] text-zinc-400 mb-1 block">Session ID:</label>
+                <input
+                  type="text"
+                  value={sukuSessionId}
+                  onChange={(e) => setSukuSessionId(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-400 mb-1 block">user_msg (User ka message):</label>
+                <input
+                  type="text"
+                  value={sukuUserMsg}
+                  onChange={(e) => setSukuUserMsg(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-400 mb-1 block">ai_msg (Suku ka reply):</label>
+                <input
+                  type="text"
+                  value={sukuAiMsg}
+                  onChange={(e) => setSukuAiMsg(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
+          ) : (
             <div>
-              <label className="text-[11px] text-zinc-400 mb-1 block">Session ID:</label>
+              <label className="text-[11px] text-zinc-400 mb-1 block">SQL Query for {currentDb}:</label>
               <input
                 type="text"
-                value={sukuSessionId}
-                onChange={(e) => setSukuSessionId(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-purple-500"
+                value={`SELECT * FROM ${selectedTable} LIMIT 10`}
+                readOnly
+                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 font-mono text-xs focus:outline-none"
               />
             </div>
-            <div>
-              <label className="text-[11px] text-zinc-400 mb-1 block">user_msg (Aapka message):</label>
-              <input
-                type="text"
-                value={sukuUserMsg}
-                onChange={(e) => setSukuUserMsg(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] text-zinc-400 mb-1 block">ai_msg (Suku ka reply):</label>
-              <input
-                type="text"
-                value={sukuAiMsg}
-                onChange={(e) => setSukuAiMsg(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-purple-500"
-              />
-            </div>
-          </div>
+          )}
 
           <div className="flex items-center justify-between pt-1">
             <button
-              onClick={handleSendSukuTest}
-              disabled={sukuTesting}
+              onClick={isSukuDb ? handleSendSukuTest : handleSendTestRequest}
+              disabled={sukuTesting || testing}
               className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
             >
-              <Send className={`h-3.5 w-3.5 ${sukuTesting ? 'animate-spin' : ''}`} />
-              <span>{sukuTesting ? 'Saving to AetherDB...' : 'Send Test Chat Record'}</span>
+              <Send className={`h-3.5 w-3.5 ${sukuTesting || testing ? 'animate-spin' : ''}`} />
+              <span>{sukuTesting || testing ? 'Executing...' : `Execute Request on ${currentDb}`}</span>
             </button>
 
             {sukuResponse && (
               <div className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Saved successfully (Row ID: {sukuResponse?.data?.id || 'OK'})</span>
+                <span>Saved successfully in {currentDb}.{selectedTable}!</span>
               </div>
             )}
           </div>
 
-          {sukuResponse && (
+          {(sukuResponse || testResponse) && (
             <pre className="p-3 bg-zinc-900 border border-zinc-800 rounded text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-36">
-              {JSON.stringify(sukuResponse, null, 2)}
+              {JSON.stringify(sukuResponse || JSON.parse(testResponse || '{}'), null, 2)}
             </pre>
           )}
         </div>
       </div>
 
-      {/* Code Snippets Section */}
+      {/* Code Snippets Section (Dynamic for currentDb & selectedTable) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
           <div className="flex flex-wrap gap-1.5">
@@ -446,6 +565,16 @@ aether.channel('suku_chat_db:chat_history')
               }`}
             >
               🤖 Suku AI (Python)
+            </button>
+            <button
+              onClick={() => setSelectedLang('python')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                selectedLang === 'python'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              Python Client
             </button>
             <button
               onClick={() => setSelectedLang('node')}
@@ -466,16 +595,6 @@ aether.channel('suku_chat_db:chat_history')
               }`}
             >
               cURL Request
-            </button>
-            <button
-              onClick={() => setSelectedLang('python')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                selectedLang === 'python'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Raw SQL (Python)
             </button>
             <button
               onClick={() => setSelectedLang('aether_sdk')}
@@ -521,7 +640,7 @@ aether.channel('suku_chat_db:chat_history')
             ) : (
               <>
                 <Copy className="h-3.5 w-3.5" />
-                <span>Copy Code</span>
+                <span>Copy Code ({currentDb})</span>
               </>
             )}
           </button>
@@ -556,7 +675,7 @@ aether.channel('suku_chat_db:chat_history')
             type="text"
             value={testEndpoint}
             onChange={(e) => setTestEndpoint(e.target.value)}
-            placeholder="/api/v1/suku/chat"
+            placeholder="/api/v1/query"
             className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500"
           />
 

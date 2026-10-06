@@ -49,6 +49,7 @@ export default function DatabaseServerApp() {
 
   const [currentDb, setCurrentDb] = useState<string>('aetherdb');
   const [databases, setDatabases] = useState<string[]>(['aetherdb', 'main_db']);
+  const [databaseOwners, setDatabaseOwners] = useState<Record<string, string>>({});
   const [tables, setTables] = useState<{ name: string; rowCount: number }[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('console');
@@ -177,6 +178,11 @@ export default function DatabaseServerApp() {
     const data = await safeFetchJson('/api/db/databases');
     if (data?.success && data.databases) {
       const names = data.databases.map((d: any) => d.name);
+      const ownersMap: Record<string, string> = {};
+      data.databases.forEach((d: any) => {
+        if (d.owner) ownersMap[d.name] = d.owner;
+      });
+      setDatabaseOwners(ownersMap);
       setDatabases(names);
       if (!names.includes(currentDb) && names.length > 0) {
         setCurrentDb(names[0]);
@@ -527,7 +533,14 @@ export default function DatabaseServerApp() {
           )}
 
           {activeTab === 'apihub' && (
-            <ApiHub currentDb={currentDb} />
+            <ApiHub
+              currentDb={currentDb}
+              databases={databases}
+              tables={tables}
+              onSelectDb={(db) => setCurrentDb(db)}
+              currentUserEmail={currentUser.email}
+              databaseOwners={databaseOwners}
+            />
           )}
 
           {activeTab === 'users' && (

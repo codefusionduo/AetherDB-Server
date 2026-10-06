@@ -25,7 +25,7 @@ export class DatabaseEngine {
     return this.databases;
   }
 
-  public createDatabase(name: string): boolean {
+  public createDatabase(name: string, owner?: string): boolean {
     const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
     if (!cleanName || this.databases[cleanName]) return false;
 
@@ -35,7 +35,8 @@ export class DatabaseEngine {
       collation: 'utf8mb4_unicode_ci',
       sizeBytes: 1024 * 64,
       tables: {},
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      owner: owner || 'system'
     };
     return true;
   }

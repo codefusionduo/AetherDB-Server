@@ -19,6 +19,7 @@ export async function GET() {
         tableCount: tableNames.length,
         totalRows,
         createdAt: db.createdAt,
+        owner: db.owner || (db.name === 'suku_chat_db' ? 'suku_ai' : 'system'),
         tables: tableNames
       };
     });
@@ -31,13 +32,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name } = await req.json();
+    const { name, owner } = await req.json();
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ success: false, error: 'Database name is required' }, { status: 400 });
     }
 
+    const creatorEmail = req.headers.get('x-user-email') || owner || 'system';
+
     const engine = getEngine();
-    const created = engine.createDatabase(name);
+    const created = engine.createDatabase(name, creatorEmail);
     if (!created) {
       return NextResponse.json({ success: false, error: `Database '${name}' already exists or invalid name` }, { status: 400 });
     }
